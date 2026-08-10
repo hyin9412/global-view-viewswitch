@@ -26,9 +26,10 @@ import availabilityIcon from '../.figma/image/msn0hwx8-6njanzc.svg';
 import infoIcon from '../.figma/image/msn0hwx8-7dj880f.svg';
 import editIcon from '../.figma/image/msn0hwx8-ufnp18x.svg';
 import databaseTypeIcon from '../.figma/image/msn0hwx8-w6aho7f.svg';
-import { siteGroups } from './siteVregionDataset';
+import { simpleSiteGroups, siteGroups, type SiteGroup } from './siteVregionDataset';
 
 const schemes = ['方案一', '方案二', '方案三', '方案四'];
+const dataModes = ['复杂数据', '简单数据'] as const;
 const VREGION_TAB_GAP = 16;
 const AGGREGATED_PSMS = [
   {
@@ -80,12 +81,20 @@ const siteIconMap = {
   'EU-TTP': euTtpIcon,
 } as const;
 
-const globalGroups = siteGroups.map((group) => ({
-  ...group,
-  icon: siteIconMap[group.label as keyof typeof siteIconMap] ?? globalViewIcon,
-}));
+type GlobalGroup = SiteGroup & {
+  icon: string;
+};
 
-const siteTagMap: Partial<Record<(typeof globalGroups)[number]['label'], string>> = {
+type VregionItem = GlobalGroup['vregions'][number];
+
+function buildGlobalGroups(groups: SiteGroup[]): GlobalGroup[] {
+  return groups.map((group) => ({
+    ...group,
+    icon: siteIconMap[group.label as keyof typeof siteIconMap] ?? globalViewIcon,
+  }));
+}
+
+const siteTagMap: Partial<Record<string, string>> = {
   CN: '中国站',
   BOE: 'BOE',
   'I18N-BD': '国际站',
@@ -96,42 +105,62 @@ const siteTagMap: Partial<Record<(typeof globalGroups)[number]['label'], string>
 
 export default function App() {
   const [activeScheme, setActiveScheme] = useState(schemes[0]);
+  const [activeDataMode, setActiveDataMode] = useState<(typeof dataModes)[number]>(dataModes[0]);
+  const globalGroups = useMemo(
+    () => buildGlobalGroups(activeDataMode === '复杂数据' ? siteGroups : simpleSiteGroups),
+    [activeDataMode],
+  );
 
   return (
     <main className="page">
       <section className="panel">
-        <div className="scheme-selector" aria-label="方案选择器">
-          {schemes.map((scheme) => (
-            <button
-              className={`scheme-button ${activeScheme === scheme ? 'active' : ''}`}
-              key={scheme}
-              type="button"
-              onClick={() => setActiveScheme(scheme)}
-            >
-              {scheme}
-            </button>
-          ))}
+        <div className="top-selectors">
+          <div className="scheme-selector" aria-label="方案选择器">
+            {schemes.map((scheme) => (
+              <button
+                className={`scheme-button ${activeScheme === scheme ? 'active' : ''}`}
+                key={scheme}
+                type="button"
+                onClick={() => setActiveScheme(scheme)}
+              >
+                {scheme}
+              </button>
+            ))}
+          </div>
+
+          <div className="data-selector" aria-label="数据选择器">
+            {dataModes.map((mode) => (
+              <button
+                className={`data-button ${activeDataMode === mode ? 'active' : ''}`}
+                key={mode}
+                type="button"
+                onClick={() => setActiveDataMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {activeScheme === '方案一' ? <SchemeOne /> : null}
-        {activeScheme === '方案二' ? <SchemeTwo /> : null}
-        {activeScheme === '方案三' ? <SchemeThree /> : null}
+        {activeScheme === '方案一' ? <SchemeOne groups={globalGroups} /> : null}
+        {activeScheme === '方案二' ? <SchemeTwo groups={globalGroups} /> : null}
+        {activeScheme === '方案三' ? <SchemeThree groups={globalGroups} /> : null}
         {activeScheme === '方案四' ? <Placeholder scheme={activeScheme} /> : null}
       </section>
     </main>
   );
 }
 
-function SchemeOne() {
-  return <RdsPage viewFrame={<SchemeOneGlobalViewFrame />} />;
+function SchemeOne({ groups }: { groups: GlobalGroup[] }) {
+  return <RdsPage viewFrame={<SchemeOneGlobalViewFrame groups={groups} />} />;
 }
 
-function SchemeTwo() {
-  return <RdsPage viewFrame={<SchemeTwoGlobalViewFrame />} />;
+function SchemeTwo({ groups }: { groups: GlobalGroup[] }) {
+  return <RdsPage viewFrame={<SchemeTwoGlobalViewFrame groups={groups} />} />;
 }
 
-function SchemeThree() {
-  return <RdsPage viewFrame={<SchemeThreeGlobalViewFrame />} />;
+function SchemeThree({ groups }: { groups: GlobalGroup[] }) {
+  return <RdsPage viewFrame={<SchemeThreeGlobalViewFrame groups={groups} />} />;
 }
 
 function RdsPage({ viewFrame }: { viewFrame: ReactElement }) {
@@ -418,10 +447,17 @@ function InfoSection({
   );
 }
 
-function SchemeOneGlobalViewFrame() {
-  const [activeGroup, setActiveGroup] = useState('CN');
-  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections());
-  const activeGroupData = globalGroups.find((group) => group.label === activeGroup) ?? globalGroups[1];
+function SchemeOneGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
+
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+  }, [defaultActiveGroupLabel, groups]);
+
+  const activeGroupData = groups.find((group) => group.label === activeGroup) ?? groups[0];
   const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
 
   return (
@@ -444,7 +480,7 @@ function SchemeOneGlobalViewFrame() {
 
           <div className="global-group-row">
             <div className="global-group-tabs">
-              {globalGroups.map((group) => (
+              {groups.map((group) => (
                 <button
                   className={`global-group-tab ${activeGroup === group.label ? 'selected' : ''}`}
                   key={group.label}
@@ -497,29 +533,29 @@ type GroupSelection = {
   vdc?: string;
 };
 
-function getDefaultVregionSelection(vregion?: (typeof globalGroups)[number]['vregions'][number]): GroupSelection {
+function getDefaultVregionSelection(vregion?: VregionItem): GroupSelection {
   return {
     vregion: vregion?.name ?? '',
     vdc: vregion?.vdcs[0],
   };
 }
 
-function getDefaultGroupSelection(group: (typeof globalGroups)[number]): GroupSelection {
-  return getDefaultVregionSelection(group.vregions[0]);
+function getDefaultGroupSelection(group?: GlobalGroup): GroupSelection {
+  return getDefaultVregionSelection(group?.vregions[0]);
 }
 
-function getGroupByLabel(label: string) {
-  return globalGroups.find((group) => group.label === label) ?? globalGroups[0];
+function getGroupByLabel(groups: GlobalGroup[], label: string) {
+  return groups.find((group) => group.label === label) ?? groups[0];
 }
 
-function buildDefaultGroupSelections() {
-  return globalGroups.reduce<Record<string, GroupSelection>>((result, group) => {
+function buildDefaultGroupSelections(groups: GlobalGroup[]) {
+  return groups.reduce<Record<string, GroupSelection>>((result, group) => {
     result[group.label] = getDefaultGroupSelection(group);
     return result;
   }, {});
 }
 
-function formatGroupPath(group: (typeof globalGroups)[number], selection: GroupSelection) {
+function formatGroupPath(group: GlobalGroup, selection: GroupSelection) {
   if (group.label === '全球视图') {
     return group.label;
   }
@@ -533,7 +569,7 @@ function formatGroupPath(group: (typeof globalGroups)[number], selection: GroupS
   return segments.filter(Boolean).join(' / ');
 }
 
-function getGroupCount(group: (typeof globalGroups)[number]) {
+function getGroupCount(group: GlobalGroup) {
   return group.count ?? String(group.vregions.length);
 }
 
@@ -541,7 +577,7 @@ function getSelectionMenuKey(selection: GroupSelection) {
   return selection.vdc ? `vdc:${selection.vregion}:${selection.vdc}` : `vregion:${selection.vregion}`;
 }
 
-function formatSelectionPath(group: (typeof globalGroups)[number], selection: GroupSelection) {
+function formatSelectionPath(group: GlobalGroup, selection: GroupSelection) {
   if (group.label === '全球视图') {
     return group.label;
   }
@@ -555,10 +591,7 @@ function formatSelectionPath(group: (typeof globalGroups)[number], selection: Gr
   return segments.filter(Boolean).join(' / ');
 }
 
-function formatVregionTabLabel(
-  item: (typeof globalGroups)[number]['vregions'][number],
-  selection: GroupSelection,
-) {
+function formatVregionTabLabel(item: VregionItem, selection: GroupSelection) {
   if (selection.vregion === item.name && selection.vdc) {
     return `${item.name} / ${selection.vdc}`;
   }
@@ -576,6 +609,7 @@ function CompactBreadcrumb() {
       </div>
       <span className="breadcrumb-aggregate-dash">-</span>
       <Popover
+        className="aggregate-psm-popover-wrapper"
         content={
           <div className="aggregate-psm-popover">
             <div className="aggregate-psm-popover-header">
@@ -605,12 +639,19 @@ function CompactBreadcrumb() {
   );
 }
 
-function SchemeTwoGlobalViewFrame() {
-  const [activeGroup, setActiveGroup] = useState('CN');
-  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections());
+function SchemeTwoGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
   const [openMenuGroup, setOpenMenuGroup] = useState<string | null>(null);
 
-  const activeGroupData = globalGroups.find((group) => group.label === activeGroup) ?? globalGroups[1];
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+    setOpenMenuGroup(null);
+  }, [defaultActiveGroupLabel, groups]);
+
+  const activeGroupData = groups.find((group) => group.label === activeGroup) ?? groups[0];
   const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
 
   const updateGroupSelection = (groupLabel: string, nextSelection: GroupSelection) => {
@@ -642,7 +683,7 @@ function SchemeTwoGlobalViewFrame() {
 
           <div className="global-group-row scheme-two">
             <div className="global-group-tabs scheme-two">
-              {globalGroups.map((group) => {
+              {groups.map((group) => {
                 const isActive = activeGroup === group.label;
                 const hasMultipleVregions = group.label !== '全球视图' && group.vregions.length > 1;
                 const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
@@ -736,21 +777,30 @@ function SchemeTwoGlobalViewFrame() {
   );
 }
 
-function SchemeThreeGlobalViewFrame() {
-  const [activeGroup, setActiveGroup] = useState('CN');
-  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections());
+function SchemeThreeGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const defaultActiveGroup = getGroupByLabel(groups, defaultActiveGroupLabel);
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
   const [isSelectorOpen, setIsSelectorOpen] = useState(false);
-  const [panelGroupLabel, setPanelGroupLabel] = useState('CN');
-  const [panelVregionName, setPanelVregionName] = useState(() => {
-    const defaultGroup = getGroupByLabel('CN');
-    return getDefaultGroupSelection(defaultGroup).vregion;
-  });
+  const [panelGroupLabel, setPanelGroupLabel] = useState(defaultActiveGroupLabel);
+  const [panelVregionName, setPanelVregionName] = useState(() => getDefaultGroupSelection(defaultActiveGroup).vregion);
 
-  const activeGroupData = getGroupByLabel(activeGroup);
+  useEffect(() => {
+    const nextDefaultGroup = getGroupByLabel(groups, defaultActiveGroupLabel);
+    const nextDefaultSelection = getDefaultGroupSelection(nextDefaultGroup);
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+    setIsSelectorOpen(false);
+    setPanelGroupLabel(defaultActiveGroupLabel);
+    setPanelVregionName(nextDefaultSelection.vregion);
+  }, [defaultActiveGroupLabel, groups]);
+
+  const activeGroupData = getGroupByLabel(groups, activeGroup);
   const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
   const triggerLabel = formatSelectionPath(activeGroupData, activeSelection);
 
-  const panelGroupData = getGroupByLabel(panelGroupLabel);
+  const panelGroupData = getGroupByLabel(groups, panelGroupLabel);
   const showVregionPanel = panelGroupLabel !== '全球视图';
   const panelSelection = groupSelections[panelGroupLabel] ?? getDefaultGroupSelection(panelGroupData);
   const panelVregion =
@@ -788,7 +838,7 @@ function SchemeThreeGlobalViewFrame() {
                     <div className="site-selector-col site-selector-col-site">
                       <div className="site-selector-panel-header">站点</div>
                       <div className="site-selector-list">
-                        {globalGroups.map((group) => {
+                        {groups.map((group) => {
                           const isSelected = group.label === panelGroupLabel;
                           const siteTag = siteTagMap[group.label];
                           const hasSiteChildren = group.label !== '全球视图';
@@ -1005,7 +1055,7 @@ function VregionTabs({
   selection,
   onChange,
 }: {
-  vregions: (typeof globalGroups)[number]['vregions'];
+  vregions: VregionItem[];
   selection: GroupSelection;
   onChange: (selection: GroupSelection) => void;
 }) {

@@ -213,3 +213,27 @@ function buildSiteGroups(markdown: string) {
 }
 
 export const siteGroups = buildSiteGroups(datasetMarkdown);
+
+export const simpleSiteGroups: SiteGroup[] = [
+  {
+    label: 'CN',
+    count: '2',
+    source: '简单数据造数',
+    note: '简化演示',
+    vregions: [
+      { name: 'China-East', vdcs: [] },
+      { name: 'China-North', vdcs: [] },
+    ],
+  },
+  {
+    label: 'I18N-BD',
+    count: '3',
+    source: '简单数据造数',
+    note: '简化演示，含 VDC',
+    vregions: [
+      { name: 'Asia-CIS', vdcs: [] },
+      { name: 'Europe-WestBD', vdcs: ['be2a', 'bddedt'] },
+      { name: 'US-EastBD', vdcs: [] },
+    ],
+  },
+];
