@@ -28,7 +28,7 @@ import editIcon from '../.figma/image/msn0hwx8-ufnp18x.svg';
 import databaseTypeIcon from '../.figma/image/msn0hwx8-w6aho7f.svg';
 import { simpleSiteGroups, siteGroups, type SiteGroup } from './siteVregionDataset';
 
-const schemes = ['方案一', '方案二', '方案三', '方案四'];
+const schemes = ['方案一', '方案二', '方案三'];
 const dataModes = ['复杂数据', '简单数据'] as const;
 const VREGION_TAB_GAP = 16;
 const AGGREGATED_PSMS = [
@@ -145,7 +145,6 @@ export default function App() {
         {activeScheme === '方案一' ? <SchemeOne groups={globalGroups} /> : null}
         {activeScheme === '方案二' ? <SchemeTwo groups={globalGroups} /> : null}
         {activeScheme === '方案三' ? <SchemeThree groups={globalGroups} /> : null}
-        {activeScheme === '方案四' ? <Placeholder scheme={activeScheme} /> : null}
       </section>
     </main>
   );
@@ -1204,15 +1203,5 @@ function VregionTabs({
         </span>
       </div>
     </div>
-  );
-}
-
-function Placeholder({ scheme }: { scheme: string }) {
-  return (
-    <section className="content-card">
-      <p className="eyebrow">当前选择</p>
-      <h1>{scheme}</h1>
-      <p className="description">这里可以继续放置 {scheme} 的页面内容。</p>
-    </section>
   );
 }
