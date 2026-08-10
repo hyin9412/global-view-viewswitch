@@ -26,11 +26,16 @@ import availabilityIcon from '../.figma/image/msn0hwx8-6njanzc.svg';
 import infoIcon from '../.figma/image/msn0hwx8-7dj880f.svg';
 import editIcon from '../.figma/image/msn0hwx8-ufnp18x.svg';
 import databaseTypeIcon from '../.figma/image/msn0hwx8-w6aho7f.svg';
+import sidebarDividerIcon from '../.figma/image/msn809g5-1f8iip1.svg';
+import sidebarFoldIcon from '../.figma/image/msn809g5-edg0sv1.svg';
 import { simpleSiteGroups, siteGroups, type SiteGroup } from './siteVregionDataset';
 
-const schemes = ['方案一', '方案二', '方案三'];
+const schemes = ['方案一', '方案二', '方案三', '方案四', '方案五', '方案六'];
 const dataModes = ['复杂数据', '简单数据'] as const;
+const sidebarModes = ['无侧边栏', '有侧边栏'] as const;
 const VREGION_TAB_GAP = 16;
+const SCHEME_FOUR_MAX_VISIBLE_VREGIONS = 7;
+const SCHEME_FOUR_TAB_GAP = 8;
 const AGGREGATED_PSMS = [
   {
     name: 'toutiao.mysql.cp_govern_write',
@@ -42,6 +47,7 @@ const AGGREGATED_PSMS = [
   },
 ] as const;
 const AGGREGATED_PSM_COUNT = AGGREGATED_PSMS.length;
+const primaryNavItems = ['首页', '集群列表', 'Topic', 'Consumer group', 'Mirror', 'Databus', 'GlobalBMQ', '个人工单'] as const;
 
 const featureTabs = [
   '总览',
@@ -106,6 +112,7 @@ const siteTagMap: Partial<Record<string, string>> = {
 export default function App() {
   const [activeScheme, setActiveScheme] = useState(schemes[0]);
   const [activeDataMode, setActiveDataMode] = useState<(typeof dataModes)[number]>(dataModes[0]);
+  const [activeSidebarMode, setActiveSidebarMode] = useState<(typeof sidebarModes)[number]>(sidebarModes[0]);
   const globalGroups = useMemo(
     () => buildGlobalGroups(activeDataMode === '复杂数据' ? siteGroups : simpleSiteGroups),
     [activeDataMode],
@@ -140,29 +147,77 @@ export default function App() {
               </button>
             ))}
           </div>
+
+          <div className="sidebar-selector" aria-label="侧边栏选择器">
+            {sidebarModes.map((mode) => (
+              <button
+                className={`sidebar-button ${activeSidebarMode === mode ? 'active' : ''}`}
+                key={mode}
+                type="button"
+                onClick={() => setActiveSidebarMode(mode)}
+              >
+                {mode}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {activeScheme === '方案一' ? <SchemeOne groups={globalGroups} /> : null}
-        {activeScheme === '方案二' ? <SchemeTwo groups={globalGroups} /> : null}
-        {activeScheme === '方案三' ? <SchemeThree groups={globalGroups} /> : null}
+        {activeScheme === '方案一' ? <SchemeOne groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
+        {activeScheme === '方案二' ? <SchemeTwo groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
+        {activeScheme === '方案三' ? <SchemeThree groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
+        {activeScheme === '方案四' ? <SchemeFour groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
+        {activeScheme === '方案五' ? <SchemeFive groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
+        {activeScheme === '方案六' ? <SchemeSix groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
       </section>
     </main>
   );
 }
 
-function SchemeOne({ groups }: { groups: GlobalGroup[] }) {
-  return <RdsPage viewFrame={<SchemeOneGlobalViewFrame groups={groups} />} />;
+function SchemeOne({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeOneGlobalViewFrame groups={groups} />} />;
 }
 
-function SchemeTwo({ groups }: { groups: GlobalGroup[] }) {
-  return <RdsPage viewFrame={<SchemeTwoGlobalViewFrame groups={groups} />} />;
+function SchemeTwo({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeTwoGlobalViewFrame groups={groups} />} />;
 }
 
-function SchemeThree({ groups }: { groups: GlobalGroup[] }) {
-  return <RdsPage viewFrame={<SchemeThreeGlobalViewFrame groups={groups} />} />;
+function SchemeThree({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeThreeGlobalViewFrame groups={groups} />} />;
 }
 
-function RdsPage({ viewFrame }: { viewFrame: ReactElement }) {
+function SchemeFour({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeFourGlobalViewFrame groups={groups} />} />;
+}
+
+function SchemeFive({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeFiveGlobalViewFrame groups={groups} />} />;
+}
+
+function SchemeSix({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeSixGlobalViewFrame groups={groups} />} />;
+}
+
+function PrimarySidebar() {
+  return (
+    <aside className="primary-sidebar" aria-label="一级导航">
+      <div className="primary-sidebar-nav">
+        {primaryNavItems.map((item) => (
+          <button className={`primary-sidebar-item ${item === 'Topic' ? 'selected' : ''}`} key={item} type="button">
+            {item}
+          </button>
+        ))}
+      </div>
+      <div className="primary-sidebar-footer">
+        <img className="primary-sidebar-divider" src={sidebarDividerIcon} alt="" />
+        <button className="primary-sidebar-fold" type="button" aria-label="收起导航">
+          <img src={sidebarFoldIcon} alt="" />
+        </button>
+      </div>
+    </aside>
+  );
+}
+
+function RdsPage({ viewFrame, hasSidebar }: { viewFrame: ReactElement; hasSidebar: boolean }) {
   return (
     <section className="bytecloud-page">
       <header className="cloud-topbar">
@@ -204,146 +259,152 @@ function RdsPage({ viewFrame }: { viewFrame: ReactElement }) {
         </div>
       </header>
 
-      <Alert
-        action={<a className="notice-link">搬迁计划</a>}
-        banner
-        className="notice-alert"
-        content={
-          <span>
-            <strong>华北1</strong>
-             2026年无资源交付（全年quota为零），建议不要申请相关资源，可考虑加入华北6搬迁计划。
-            华北6 现处于建站迁移阶段，仅向华北6搬迁项目组提供资源，搬迁结束后恢复正常申请。
-          </span>
-        }
-        showIcon
-        type="warning"
-      />
+      <div className={`bytecloud-body ${hasSidebar ? 'with-sidebar' : ''}`}>
+        {hasSidebar ? <PrimarySidebar /> : null}
 
-      {viewFrame}
+        <div className="bytecloud-main">
+          <Alert
+            action={<a className="notice-link">搬迁计划</a>}
+            banner
+            className="notice-alert"
+            content={
+              <span>
+                <strong>华北1</strong>
+                 2026年无资源交付（全年quota为零），建议不要申请相关资源，可考虑加入华北6搬迁计划。
+                华北6 现处于建站迁移阶段，仅向华北6搬迁项目组提供资源，搬迁结束后恢复正常申请。
+              </span>
+            }
+            showIcon
+            type="warning"
+          />
 
-      <div className="rds-shell">
-        <div className="rds-workspace">
-          <div className="resource-header">
-            <div className="resource-left">
-              <div className="resource-name">cp_govern</div>
-              <div className="resource-cloud-tag">字节云</div>
-              <div className="resource-level-tag">L3</div>
-            </div>
-            <button className="resource-refresh" type="button" aria-label="刷新">
-              <img src={refreshIcon} alt="" />
-            </button>
-          </div>
+          {viewFrame}
 
-          <div className="resource-body-container">
-            <div className="feature-tabs">
-              {featureTabs.map((tab) => (
-                <button className={tab === '总览' ? 'selected' : ''} key={tab} type="button">
-                  {tab}
+          <div className="rds-shell">
+            <div className="rds-workspace">
+              <div className="resource-header">
+                <div className="resource-left">
+                  <div className="resource-name">cp_govern</div>
+                  <div className="resource-cloud-tag">字节云</div>
+                  <div className="resource-level-tag">L3</div>
+                </div>
+                <button className="resource-refresh" type="button" aria-label="刷新">
+                  <img src={refreshIcon} alt="" />
                 </button>
-              ))}
-            </div>
+              </div>
 
-            <OverviewConfigCard />
-
-            <main className="rds-content">
-              <section className="content-main">
-                <div className="link-card">
-                  <div className="card-title">
-                    <span>同步链路</span>
-                    <a>链接</a>
-                  </div>
-                  <div className="empty-link-state">
-                    <div className="chain-dot" />
-                    <div className="chain-line" />
-                    <div className="chain-dot muted" />
-                  </div>
+              <div className="resource-body-container">
+                <div className="feature-tabs">
+                  {featureTabs.map((tab) => (
+                    <button className={tab === '总览' ? 'selected' : ''} key={tab} type="button">
+                      {tab}
+                    </button>
+                  ))}
                 </div>
 
-                <div className="link-card compact">
-                  <div className="card-title">
-                    <span>订阅链路</span>
-                    <button>错误明细</button>
-                  </div>
-                  <div className="error-tabs">
-                    <span className="selected">error</span>
-                    <span>request</span>
-                    <span>response</span>
-                  </div>
-                </div>
+                <OverviewConfigCard />
 
-                <div className="topology-card-real">
-                  <div className="card-title">
-                    <span>拓扑结构 <em>(点击端口可以查看对应的监控)</em></span>
-                  </div>
-                  <div className="topology-toolbar">
-                    <button>拓扑图</button>
-                    <button className="selected">节点列表</button>
-                    <input value="输入 IP 过滤" readOnly />
-                  </div>
-                  <div className="topology-stage">
-                    <div className="db-node primary">
-                      <b>主</b>
-                      <span>10.225.45.18</span>
-                      <a>: 3306</a>
+                <main className="rds-content">
+                  <section className="content-main">
+                    <div className="link-card">
+                      <div className="card-title">
+                        <span>同步链路</span>
+                        <a>链接</a>
+                      </div>
+                      <div className="empty-link-state">
+                        <div className="chain-dot" />
+                        <div className="chain-line" />
+                        <div className="chain-dot muted" />
+                      </div>
                     </div>
-                    <div className="replica-stack">
-                      {nodeRows.slice(1, 5).map((row) => (
-                        <div className="db-node" key={row[0]}>
-                          <b>从</b>
-                          <span>{row[0]}</span>
-                          <a>: {row[1].split(' / ')[0]}</a>
+
+                    <div className="link-card compact">
+                      <div className="card-title">
+                        <span>订阅链路</span>
+                        <button>错误明细</button>
+                      </div>
+                      <div className="error-tabs">
+                        <span className="selected">error</span>
+                        <span>request</span>
+                        <span>response</span>
+                      </div>
+                    </div>
+
+                    <div className="topology-card-real">
+                      <div className="card-title">
+                        <span>拓扑结构 <em>(点击端口可以查看对应的监控)</em></span>
+                      </div>
+                      <div className="topology-toolbar">
+                        <button>拓扑图</button>
+                        <button className="selected">节点列表</button>
+                        <input value="输入 IP 过滤" readOnly />
+                      </div>
+                      <div className="topology-stage">
+                        <div className="db-node primary">
+                          <b>主</b>
+                          <span>10.225.45.18</span>
+                          <a>: 3306</a>
                         </div>
-                      ))}
-                    </div>
-                    <div className="connection-line horizontal" />
-                    <div className="connection-line vertical" />
-                  </div>
-                  <table className="node-table">
-                    <thead>
-                      <tr>
-                        <th>节点</th>
-                        <th>端口</th>
-                        <th>Load</th>
-                        <th>QPS</th>
-                        <th>Thread Running</th>
-                        <th>Delay</th>
-                        <th>IO_Thread</th>
-                        <th>SQL_Thread</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {nodeRows.map((row) => (
-                        <tr key={row[0]}>
-                          {row.map((cell, index) => (
-                            <td key={`${row[0]}-${index}`}>
-                              {index === 1 ? <a>{cell}</a> : cell}
-                            </td>
+                        <div className="replica-stack">
+                          {nodeRows.slice(1, 5).map((row) => (
+                            <div className="db-node" key={row[0]}>
+                              <b>从</b>
+                              <span>{row[0]}</span>
+                              <a>: {row[1].split(' / ')[0]}</a>
+                            </div>
                           ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </section>
+                        </div>
+                        <div className="connection-line horizontal" />
+                        <div className="connection-line vertical" />
+                      </div>
+                      <table className="node-table">
+                        <thead>
+                          <tr>
+                            <th>节点</th>
+                            <th>端口</th>
+                            <th>Load</th>
+                            <th>QPS</th>
+                            <th>Thread Running</th>
+                            <th>Delay</th>
+                            <th>IO_Thread</th>
+                            <th>SQL_Thread</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {nodeRows.map((row) => (
+                            <tr key={row[0]}>
+                              {row.map((cell, index) => (
+                                <td key={`${row[0]}-${index}`}>
+                                  {index === 1 ? <a>{cell}</a> : cell}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </section>
 
-              <aside className="operation-panel">
-                <button>设置可维护时间段</button>
-                <button>修改数据库级别</button>
-                <button disabled>设置容灾等级</button>
-                <a>查看功能说明</a>
-                <div className="operation-card">
-                  <div>数据迁移</div>
-                  <p>通过 DTS 创建任务，完成数据同步和迁移链路配置。</p>
-                  <a>创建任务</a>
-                  <a>去DTS查看</a>
-                </div>
-                <div className="operation-card warning">
-                  <div>访问生产环境数据库</div>
-                  <p>生产环境数据库不支持 IP:PORT 直连，请通过 SDK 进行连接。</p>
-                  <button>申请权限</button>
-                </div>
-              </aside>
-            </main>
+                  <aside className="operation-panel">
+                    <button>设置可维护时间段</button>
+                    <button>修改数据库级别</button>
+                    <button disabled>设置容灾等级</button>
+                    <a>查看功能说明</a>
+                    <div className="operation-card">
+                      <div>数据迁移</div>
+                      <p>通过 DTS 创建任务，完成数据同步和迁移链路配置。</p>
+                      <a>创建任务</a>
+                      <a>去DTS查看</a>
+                    </div>
+                    <div className="operation-card warning">
+                      <div>访问生产环境数据库</div>
+                      <p>生产环境数据库不支持 IP:PORT 直连，请通过 SDK 进行连接。</p>
+                      <button>申请权限</button>
+                    </div>
+                  </aside>
+                </main>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -460,7 +521,7 @@ function SchemeOneGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
   const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
 
   return (
-    <section className="global-view-frame scheme-one">
+    <section className="global-view-frame scheme-one scheme-five">
       <div className="global-view-content">
         <div className="global-view-main">
           <div className="breadcrumb-line">
@@ -495,6 +556,205 @@ function SchemeOneGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
               ))}
             </div>
             <VregionTabs
+              selection={activeSelection}
+              vregions={activeGroupData.vregions}
+              onChange={(nextSelection) => {
+                setGroupSelections((currentSelections) => ({
+                  ...currentSelections,
+                  [activeGroup]: nextSelection,
+                }));
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="global-frame-actions">
+          <button className="square-action" type="button">
+            <img src={starIcon} alt="" />
+          </button>
+          <button className="gray-action" type="button">
+            一致性治理
+          </button>
+          <button className="blue-action" type="button">
+            多区域变更
+            <img src={changeDownIcon} alt="" />
+          </button>
+          <button className="square-action" type="button">
+            <img src={moreIcon} alt="" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SchemeFiveGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const globalGroup =
+    groups.find((group) => group.label === '全球视图')
+    ?? {
+      label: '全球视图',
+      source: '',
+      note: '',
+      vregions: [],
+      icon: globalViewIcon,
+    };
+  const siteGroupsOnly = groups.filter((group) => group.label !== '全球视图');
+  const defaultActiveGroupLabel = siteGroupsOnly.find((group) => group.label === 'CN')?.label ?? globalGroup.label;
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
+  const [isSiteMenuOpen, setIsSiteMenuOpen] = useState(false);
+
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+    setIsSiteMenuOpen(false);
+  }, [defaultActiveGroupLabel, groups]);
+
+  const activeGroupData = getGroupByLabel([globalGroup, ...siteGroupsOnly], activeGroup);
+  const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
+  const selectedSiteGroup = activeGroup === globalGroup.label ? undefined : activeGroupData;
+  const siteTriggerLabel = selectedSiteGroup?.label ?? '所有 Site';
+  const siteTriggerIcon = selectedSiteGroup?.icon ?? siteGroupsOnly[0]?.icon ?? globalViewIcon;
+
+  return (
+    <section className="global-view-frame scheme-one">
+      <div className="global-view-content">
+        <div className="global-view-main">
+          <div className="breadcrumb-line">
+            <span>关系型数据库RDS列表</span>
+            <i />
+            <span className="muted">cp_govern 全球视图</span>
+          </div>
+
+          <div className="view-detail-row">
+            <span className="detail-label">视图详情：</span>
+            <div className="detail-token">toutiao.mysql.cp_govern_write</div>
+            <div className="detail-value">
+              China-East | China-Enterprise | China-HKPay | China-North | China-North6 | China-Pay | US-TTP3 | US-TTP4
+            </div>
+          </div>
+
+          <div className="global-group-row">
+            <div className="global-group-tabs">
+              <button
+                className={`global-group-tab ${activeGroup === globalGroup.label ? 'selected' : ''}`}
+                type="button"
+                onClick={() => {
+                  setActiveGroup(globalGroup.label);
+                  setIsSiteMenuOpen(false);
+                }}
+              >
+                <img src={globalGroup.icon} alt="" />
+                <span>{globalGroup.label}</span>
+              </button>
+
+              <Dropdown
+                droplist={
+                  <Menu
+                    className="global-group-dropdown-menu"
+                    selectedKeys={selectedSiteGroup ? [selectedSiteGroup.label] : []}
+                    onClickMenuItem={(key) => {
+                      setActiveGroup(String(key));
+                      setIsSiteMenuOpen(false);
+                    }}
+                  >
+                    {siteGroupsOnly.map((group) => (
+                      <Menu.Item key={group.label}>
+                        <span className="global-group-dropdown-item">
+                          <img src={group.icon} alt="" />
+                          <span>{group.label}</span>
+                          {group.count ? <em>({group.count})</em> : null}
+                        </span>
+                      </Menu.Item>
+                    ))}
+                  </Menu>
+                }
+                onVisibleChange={(visible) => setIsSiteMenuOpen(visible)}
+                popupVisible={isSiteMenuOpen}
+                position="bl"
+                trigger="click"
+              >
+                <button
+                  className={`global-group-tab global-group-dropdown-trigger ${selectedSiteGroup ? 'selected' : ''}`}
+                  type="button"
+                >
+                  <img src={siteTriggerIcon} alt="" />
+                  <span>{siteTriggerLabel}</span>
+                  <img className={`global-group-tab-caret ${isSiteMenuOpen ? 'open' : ''}`} src={downIcon} alt="" />
+                </button>
+              </Dropdown>
+            </div>
+            <VregionTabs
+              selection={activeSelection}
+              vregions={activeGroupData.vregions}
+              onChange={(nextSelection) => {
+                setGroupSelections((currentSelections) => ({
+                  ...currentSelections,
+                  [activeGroup]: nextSelection,
+                }));
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="global-frame-actions">
+          <button className="square-action" type="button">
+            <img src={starIcon} alt="" />
+          </button>
+          <button className="gray-action" type="button">
+            一致性治理
+          </button>
+          <button className="blue-action" type="button">
+            多区域变更
+            <img src={changeDownIcon} alt="" />
+          </button>
+          <button className="square-action" type="button">
+            <img src={moreIcon} alt="" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function SchemeSixGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
+
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+  }, [defaultActiveGroupLabel, groups]);
+
+  const activeGroupData = getGroupByLabel(groups, activeGroup);
+  const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(activeGroupData);
+
+  return (
+    <section className="global-view-frame scheme-six">
+      <div className="global-view-content">
+        <div className="global-view-main">
+          <CompactBreadcrumb />
+
+          <div className="scheme-six-site-row">
+            <div className="scheme-six-site-strip">
+              {groups.map((group, index) => (
+                <button
+                  className={`vregion-tab-button ${activeGroup === group.label ? 'selected' : ''} ${index > 0 ? 'with-divider' : ''}`}
+                  key={group.label}
+                  type="button"
+                  onClick={() => setActiveGroup(group.label)}
+                >
+                  <img src={group.icon} alt="" />
+                  <span>{group.label}</span>
+                  {group.count ? <em>({group.count})</em> : null}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="global-group-row scheme-six">
+            <SchemeSixVregionTabs
               selection={activeSelection}
               vregions={activeGroupData.vregions}
               onChange={(nextSelection) => {
@@ -572,6 +832,10 @@ function getGroupCount(group: GlobalGroup) {
   return group.count ?? String(group.vregions.length);
 }
 
+function getVregionTabKey(groupLabel: string, vregion: string) {
+  return `${groupLabel}:${vregion}`;
+}
+
 function getSelectionMenuKey(selection: GroupSelection) {
   return selection.vdc ? `vdc:${selection.vregion}:${selection.vdc}` : `vregion:${selection.vregion}`;
 }
@@ -596,6 +860,322 @@ function formatVregionTabLabel(item: VregionItem, selection: GroupSelection) {
   }
 
   return item.name;
+}
+
+function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
+  const [openMenuTab, setOpenMenuTab] = useState<string | null>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [tabWidths, setTabWidths] = useState<Record<string, number>>({});
+  const [moreWidth, setMoreWidth] = useState(0);
+
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+    setOpenMenuTab(null);
+  }, [defaultActiveGroupLabel, groups]);
+
+  const flatVregionTabs = useMemo(
+    () => groups.flatMap((group) => group.vregions.map((item) => ({ group, item, key: getVregionTabKey(group.label, item.name) }))),
+    [groups],
+  );
+
+  const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(getGroupByLabel(groups, activeGroup));
+  const activeTabKey = getVregionTabKey(activeGroup, activeSelection.vregion);
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return undefined;
+    }
+
+    const updateWidth = () => {
+      setAvailableWidth(Math.floor(stripRef.current?.getBoundingClientRect().width ?? 0));
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!measureRef.current) {
+      return;
+    }
+
+    const nextTabWidths: Record<string, number> = {};
+    measureRef.current.querySelectorAll<HTMLElement>('[data-scheme-four-tab-key]').forEach((element) => {
+      const tabKey = element.dataset.schemeFourTabKey;
+      if (tabKey) {
+        nextTabWidths[tabKey] = Math.ceil(element.getBoundingClientRect().width);
+      }
+    });
+
+    const moreTrigger = measureRef.current.querySelector<HTMLElement>('[data-scheme-four-more-trigger]');
+    setTabWidths(nextTabWidths);
+    setMoreWidth(Math.ceil(moreTrigger?.getBoundingClientRect().width ?? 0));
+  }, [activeTabKey, activeSelection, flatVregionTabs]);
+
+  const updateActiveSelection = (groupLabel: string, nextSelection: GroupSelection) => {
+    setActiveGroup(groupLabel);
+    setGroupSelections((currentSelections) => ({
+      ...currentSelections,
+      [groupLabel]: nextSelection,
+    }));
+    setOpenMenuTab(null);
+  };
+
+  const { visibleTabs, hiddenTabs } = useMemo(
+    () => getVisibleSchemeFourTabs(flatVregionTabs, activeTabKey, availableWidth, tabWidths, moreWidth),
+    [activeTabKey, availableWidth, flatVregionTabs, moreWidth, tabWidths],
+  );
+
+  return (
+    <section className="global-view-frame scheme-two">
+      <div className="global-view-content">
+        <div className="global-view-main">
+          <div className="breadcrumb-line">
+            <span>关系型数据库RDS列表</span>
+            <i />
+            <span className="muted">cp_govern 全球视图</span>
+          </div>
+
+          <div className="view-detail-row">
+            <span className="detail-label">视图详情：</span>
+            <div className="detail-token">toutiao.mysql.cp_govern_write</div>
+            <div className="detail-value">
+              China-East | China-Enterprise | China-HKPay | China-North | China-North6 | China-Pay | US-TTP3 | US-TTP4
+            </div>
+          </div>
+
+          <div className="global-group-row scheme-four">
+            <div className="global-group-tabs-area scheme-four" ref={containerRef}>
+              <div className="global-group-tabs scheme-four" ref={stripRef}>
+                {visibleTabs.map(({ group, item, key: tabKey }) => {
+                  const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
+                  const isActive = activeGroup === group.label && selection.vregion === item.name;
+                  const hasVdcs = item.vdcs.length > 0;
+                  const tabLabel = isActive ? formatVregionTabLabel(item, selection) : item.name;
+                  const tabButton = (
+                    <button
+                      className={`site-cascade-tab ${isActive ? 'selected' : ''}`}
+                      key={tabKey}
+                      type="button"
+                      onClick={
+                        !isActive || item.vdcs.length === 0
+                          ? () => updateActiveSelection(group.label, getDefaultVregionSelection(item))
+                          : undefined
+                      }
+                    >
+                      <img src={group.icon} alt="" />
+                      <span className="site-cascade-tab-text">{tabLabel}</span>
+                      {isActive && hasVdcs ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+                    </button>
+                  );
+
+                  if (!isActive || item.vdcs.length === 0) {
+                    return tabButton;
+                  }
+
+                  return (
+                    <Dropdown
+                      droplist={
+                        <Menu
+                          className="site-cascade-menu"
+                          selectedKeys={[selection.vdc ?? item.vdcs[0]]}
+                          onClickMenuItem={(key) => {
+                            updateActiveSelection(group.label, { vregion: item.name, vdc: String(key) });
+                          }}
+                        >
+                          {item.vdcs.map((vdc) => (
+                            <Menu.Item key={vdc}>{vdc}</Menu.Item>
+                          ))}
+                        </Menu>
+                      }
+                      key={tabKey}
+                      onVisibleChange={(visible) => setOpenMenuTab(visible ? tabKey : null)}
+                      popupVisible={openMenuTab === tabKey}
+                      position="bl"
+                      trigger="click"
+                    >
+                      {tabButton}
+                    </Dropdown>
+                  );
+                })}
+
+                {hiddenTabs.length > 0 ? (
+                  <Dropdown
+                    droplist={
+                      <Menu
+                        className="site-cascade-menu scheme-four-overflow-menu"
+                        selectedKeys={[activeTabKey]}
+                        onClickMenuItem={(key) => {
+                          const nextTab = flatVregionTabs.find((tab) => tab.key === String(key));
+
+                          if (!nextTab) {
+                            return;
+                          }
+
+                          updateActiveSelection(nextTab.group.label, getDefaultVregionSelection(nextTab.item));
+                        }}
+                      >
+                        {hiddenTabs.map((tab) => (
+                          <Menu.Item key={tab.key}>
+                            <span className="scheme-four-overflow-item">
+                              <img src={tab.group.icon} alt="" />
+                              <span>{tab.item.name}</span>
+                            </span>
+                          </Menu.Item>
+                        ))}
+                      </Menu>
+                    }
+                    onVisibleChange={(visible) => setOpenMenuTab(visible ? 'scheme-four-more' : null)}
+                    popupVisible={openMenuTab === 'scheme-four-more'}
+                    position="bl"
+                    trigger="click"
+                  >
+                    <button className="site-cascade-tab scheme-four-more-tab" type="button">
+                      <span className="site-cascade-tab-text">更多 vregion</span>
+                      <img className="site-cascade-tab-caret" src={downIcon} alt="" />
+                    </button>
+                  </Dropdown>
+                ) : null}
+              </div>
+
+              <div className="vregion-tabs-measure" ref={measureRef} aria-hidden="true">
+                {flatVregionTabs.map(({ group, item, key: tabKey }) => {
+                  const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
+                  const isActive = tabKey === activeTabKey;
+                  const tabLabel = isActive ? formatVregionTabLabel(item, selection) : item.name;
+
+                  return (
+                    <span
+                      className={`site-cascade-tab ${isActive ? 'selected' : ''}`}
+                      data-scheme-four-tab-key={tabKey}
+                      key={tabKey}
+                    >
+                      <img src={group.icon} alt="" />
+                      <span className="site-cascade-tab-text">{tabLabel}</span>
+                      {isActive && item.vdcs.length > 0 ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+                    </span>
+                  );
+                })}
+                <span className="site-cascade-tab scheme-four-more-tab" data-scheme-four-more-trigger>
+                  <span className="site-cascade-tab-text">更多 vregion</span>
+                  <img className="site-cascade-tab-caret" src={downIcon} alt="" />
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="global-frame-actions">
+          <button className="square-action" type="button">
+            <img src={starIcon} alt="" />
+          </button>
+          <button className="gray-action" type="button">
+            一致性治理
+          </button>
+          <button className="blue-action" type="button">
+            多区域变更
+            <img src={changeDownIcon} alt="" />
+          </button>
+          <button className="square-action" type="button">
+            <img src={moreIcon} alt="" />
+          </button>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function getSchemeFourStripWidth(
+  visibleTabs: Array<{ key: string }>,
+  widths: Record<string, number>,
+  moreWidth = 0,
+  showMore = false,
+) {
+  const tabWidth = visibleTabs.reduce((sum, tab) => sum + (widths[tab.key] ?? 0), 0);
+  const tabGapWidth = visibleTabs.length > 1 ? SCHEME_FOUR_TAB_GAP * (visibleTabs.length - 1) : 0;
+  const moreGapWidth = showMore && visibleTabs.length > 0 ? SCHEME_FOUR_TAB_GAP : 0;
+  return tabWidth + tabGapWidth + (showMore ? moreWidth + moreGapWidth : 0);
+}
+
+function getVisibleSchemeFourTabs(
+  flatVregionTabs: Array<{ group: GlobalGroup; item: VregionItem; key: string }>,
+  activeTabKey: string,
+  availableWidth: number,
+  widths: Record<string, number>,
+  moreWidth: number,
+) {
+  const fallbackVisibleTabs = flatVregionTabs.slice(0, Math.min(SCHEME_FOUR_MAX_VISIBLE_VREGIONS, flatVregionTabs.length));
+
+  if (flatVregionTabs.length === 0) {
+    return { visibleTabs: [] as typeof flatVregionTabs, hiddenTabs: [] as typeof flatVregionTabs };
+  }
+
+  if (availableWidth <= 0) {
+    return {
+      visibleTabs: fallbackVisibleTabs,
+      hiddenTabs: flatVregionTabs.slice(fallbackVisibleTabs.length),
+    };
+  }
+
+  let candidateTabs = flatVregionTabs.slice(0, Math.min(SCHEME_FOUR_MAX_VISIBLE_VREGIONS, flatVregionTabs.length));
+  const activeTab = flatVregionTabs.find((tab) => tab.key === activeTabKey);
+
+  if (activeTab && !candidateTabs.some((tab) => tab.key === activeTabKey)) {
+    candidateTabs = [...candidateTabs.slice(0, Math.max(candidateTabs.length - 1, 0)), activeTab];
+  }
+
+  const visibleKeySet = new Set<string>();
+  candidateTabs = candidateTabs.filter((tab) => {
+    if (visibleKeySet.has(tab.key)) {
+      return false;
+    }
+    visibleKeySet.add(tab.key);
+    return true;
+  });
+
+  while (candidateTabs.length > 0) {
+    const nextVisibleKeySet = new Set(candidateTabs.map((tab) => tab.key));
+    const hiddenTabs = flatVregionTabs.filter((tab) => !nextVisibleKeySet.has(tab.key));
+    const nextWidth = getSchemeFourStripWidth(candidateTabs, widths, moreWidth, hiddenTabs.length > 0);
+
+    if (nextWidth <= availableWidth) {
+      return { visibleTabs: candidateTabs, hiddenTabs };
+    }
+
+    let removableIndex = -1;
+    for (let index = candidateTabs.length - 1; index >= 0; index -= 1) {
+      if (candidateTabs[index].key !== activeTabKey) {
+        removableIndex = index;
+        break;
+      }
+    }
+
+    if (removableIndex === -1) {
+      if (moreWidth > 0 && moreWidth <= availableWidth) {
+        return { visibleTabs: [] as typeof flatVregionTabs, hiddenTabs: flatVregionTabs };
+      }
+
+      return {
+        visibleTabs: candidateTabs,
+        hiddenTabs: flatVregionTabs.filter((tab) => tab.key !== candidateTabs[0]?.key),
+      };
+    }
+
+    candidateTabs = candidateTabs.filter((_, index) => index !== removableIndex);
+  }
+
+  return { visibleTabs: [] as typeof flatVregionTabs, hiddenTabs: flatVregionTabs };
 }
 
 function CompactBreadcrumb() {
@@ -1200,6 +1780,169 @@ function VregionTabs({
         <span className="more-vregion with-divider" data-more-trigger>
           更多 vregion
           <img src={downIcon} alt="" />
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function SchemeSixVregionTabs({
+  vregions,
+  selection,
+  onChange,
+}: {
+  vregions: VregionItem[];
+  selection: GroupSelection;
+  onChange: (selection: GroupSelection) => void;
+}) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [tabWidths, setTabWidths] = useState<Record<string, number>>({});
+  const [moreWidth, setMoreWidth] = useState(0);
+  const [openMenuTab, setOpenMenuTab] = useState<string | null>(null);
+  const activeVregion = selection.vregion;
+  const vregionNames = vregions.map((item) => item.name);
+
+  useEffect(() => {
+    if (!containerRef.current) {
+      return undefined;
+    }
+
+    const updateWidth = () => {
+      setAvailableWidth(Math.floor(stripRef.current?.getBoundingClientRect().width ?? 0));
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
+    if (!measureRef.current) {
+      return;
+    }
+
+    const nextTabWidths: Record<string, number> = {};
+    measureRef.current.querySelectorAll<HTMLElement>('[data-scheme-six-vregion-name]').forEach((element) => {
+      const tabName = element.dataset.schemeSixVregionName;
+      if (tabName) {
+        nextTabWidths[tabName] = Math.ceil(element.getBoundingClientRect().width);
+      }
+    });
+
+    const moreTrigger = measureRef.current.querySelector<HTMLElement>('[data-scheme-six-more-trigger]');
+    setTabWidths(nextTabWidths);
+    setMoreWidth(Math.ceil(moreTrigger?.getBoundingClientRect().width ?? 0));
+  }, [selection, vregions]);
+
+  const { visibleVregions, hiddenVregions } = useMemo(
+    () => getVisibleVregions(vregionNames, activeVregion, availableWidth, tabWidths, moreWidth),
+    [activeVregion, availableWidth, moreWidth, tabWidths, vregionNames],
+  );
+
+  return (
+    <div className="scheme-six-vregion-tabs-area" ref={containerRef}>
+      <div className="global-group-tabs scheme-four scheme-six-vregion-strip" ref={stripRef}>
+        {visibleVregions.map((tab) => {
+          const item = vregions.find((vregion) => vregion.name === tab);
+
+          if (!item) {
+            return null;
+          }
+
+          const isSelected = tab === activeVregion;
+          const tabContent = (
+            <button
+              className={`site-cascade-tab scheme-six-vregion-tab ${isSelected ? 'selected' : ''}`}
+              key={tab}
+              type="button"
+              onClick={
+                !isSelected || item.vdcs.length === 0
+                  ? () => onChange(getDefaultVregionSelection(item))
+                  : undefined
+              }
+            >
+              <span className="site-cascade-tab-text">{formatVregionTabLabel(item, selection)}</span>
+              {isSelected && item.vdcs.length > 0 ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+            </button>
+          );
+
+          if (!isSelected || item.vdcs.length === 0) {
+            return tabContent;
+          }
+
+          return (
+            <Dropdown
+              droplist={
+                <Menu
+                  className="site-cascade-menu"
+                  selectedKeys={[selection.vdc ?? item.vdcs[0]]}
+                  onClickMenuItem={(key) => onChange({ vregion: item.name, vdc: String(key) })}
+                >
+                  {item.vdcs.map((vdc) => (
+                    <Menu.Item key={vdc}>{`${item.name} / ${vdc}`}</Menu.Item>
+                  ))}
+                </Menu>
+              }
+              key={tab}
+              onVisibleChange={(visible) => setOpenMenuTab(visible ? tab : null)}
+              popupVisible={openMenuTab === tab}
+              position="bl"
+              trigger="click"
+            >
+              {tabContent}
+            </Dropdown>
+          );
+        })}
+
+        {hiddenVregions.length > 0 ? (
+          <Dropdown
+            droplist={
+              <Menu
+                className="site-cascade-menu scheme-four-overflow-menu"
+                selectedKeys={[activeVregion]}
+                onClickMenuItem={(key) => {
+                  const item = vregions.find((vregion) => vregion.name === String(key));
+                  onChange(getDefaultVregionSelection(item));
+                }}
+              >
+                {hiddenVregions.map((tab) => (
+                  <Menu.Item key={tab}>{tab}</Menu.Item>
+                ))}
+              </Menu>
+            }
+            onVisibleChange={(visible) => setOpenMenuTab(visible ? 'scheme-six-more' : null)}
+            popupVisible={openMenuTab === 'scheme-six-more'}
+            position="bl"
+            trigger="click"
+          >
+            <button className="site-cascade-tab scheme-four-more-tab scheme-six-vregion-tab" type="button">
+              <span className="site-cascade-tab-text">更多 vregion</span>
+              <img className="site-cascade-tab-caret" src={downIcon} alt="" />
+            </button>
+          </Dropdown>
+        ) : null}
+      </div>
+
+      <div className="vregion-tabs-measure" ref={measureRef} aria-hidden="true">
+        {vregions.map((item) => (
+          <span
+            className={`site-cascade-tab scheme-six-vregion-tab ${item.name === activeVregion ? 'selected' : ''}`}
+            data-scheme-six-vregion-name={item.name}
+            key={item.name}
+          >
+            <span className="site-cascade-tab-text">{formatVregionTabLabel(item, selection)}</span>
+            {item.name === activeVregion && item.vdcs.length > 0 ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+          </span>
+        ))}
+        <span className="site-cascade-tab scheme-four-more-tab scheme-six-vregion-tab" data-scheme-six-more-trigger>
+          <span className="site-cascade-tab-text">更多 vregion</span>
+          <img className="site-cascade-tab-caret" src={downIcon} alt="" />
         </span>
       </div>
     </div>

@@ -32,13 +32,8 @@ const FALLBACK_SITE_GROUPS: SiteGroup[] = [
   {
     label: '全球视图',
     source: '现有原型造数',
-    note: '全局聚合视图',
-    vregions: [
-      { name: 'Global', vdcs: [] },
-      { name: 'China-East', vdcs: [] },
-      { name: 'US-EastBD', vdcs: [] },
-      { name: 'Europe-WestBD', vdcs: [] },
-    ],
+    note: '全局聚合视图，不细分 vregion',
+    vregions: [],
   },
   {
     label: 'CN',
@@ -53,17 +48,6 @@ const FALLBACK_SITE_GROUPS: SiteGroup[] = [
       { name: 'China-North6', vdcs: [] },
       { name: 'China-Pay', vdcs: [] },
       { name: 'China-Pay2', vdcs: [] },
-    ],
-  },
-  {
-    label: 'BOE',
-    count: '3',
-    source: '现有原型造数',
-    note: '临时造数',
-    vregions: [
-      { name: 'Boe-North', vdcs: [] },
-      { name: 'Boe-East', vdcs: [] },
-      { name: 'Boe-South', vdcs: [] },
     ],
   },
   {
@@ -207,7 +191,7 @@ function buildSiteGroups(markdown: string) {
       note: row.备注,
       vregions: detailMap.get(row.site) ?? [],
     }))
-    .filter((group) => group.vregions.length > 0);
+    .filter((group) => group.label === '全球视图' || group.vregions.length > 0);
 
   return siteGroups.length > 0 ? siteGroups : FALLBACK_SITE_GROUPS;
 }

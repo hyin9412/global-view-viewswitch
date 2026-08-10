@@ -13,9 +13,8 @@
 
 | site | 数据来源 | vregion_count | 备注 |
 | --- | --- | ---: | --- |
-| 全球视图 | 现有原型造数 | 4 | 全局聚合视图 |
+| 全球视图 | 现有原型造数 | 0 | 全局聚合视图，不细分 vregion |
 | CN | 用户提供 | 7 | 与图1一致 |
-| BOE | 现有原型造数 | 3 | 临时造数 |
 | I18N-BD | 用户提供 | 11 | 与图2一致，且 `Europe-WestBD` 下有 VDC |
 | I18N-TT | 现有原型造数 | 3 | 临时造数 |
 | US-TTP | 现有原型造数 | 1 | 临时造数 |
@@ -26,10 +25,6 @@
 
 | site | vregion | vdc_list | 数据来源 | 备注 |
 | --- | --- | --- | --- | --- |
-| 全球视图 | Global | - | 现有原型造数 | 全局入口 |
-| 全球视图 | China-East | - | 现有原型造数 |  |
-| 全球视图 | US-EastBD | - | 现有原型造数 |  |
-| 全球视图 | Europe-WestBD | - | 现有原型造数 |  |
 | CN | China-East | - | 用户提供 | 图1 |
 | CN | China-Enterprise | - | 用户提供 | 图1 |
 | CN | China-HKPay | - | 用户提供 | 图1 |
@@ -37,9 +32,6 @@
 | CN | China-North6 | - | 用户提供 | 图1 |
 | CN | China-Pay | - | 用户提供 | 图1 |
 | CN | China-Pay2 | - | 用户提供 | 图1 |
-| BOE | Boe-North | - | 现有原型造数 | 临时造数 |
-| BOE | Boe-East | - | 现有原型造数 | 临时造数 |
-| BOE | Boe-South | - | 现有原型造数 | 临时造数 |
 | I18N-BD | Asia-CIS | - | 用户提供 | 图2 |
 | I18N-BD | Asia-SaaS | - | 用户提供 | 图2 |
 | I18N-BD | Asia-SouthEastBD | - | 用户提供 | 图2 |
@@ -73,3 +65,4 @@
 - site Tab 用 `site`
 - vregion Tab / 下拉用 `vregion`
 - 二级下钻或附加标签用 `vdc_list`
+- `全球视图` 仅作为聚合入口，不应灌出任何 vregion / vdc 明细
