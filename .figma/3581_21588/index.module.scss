@@ -1,0 +1,100 @@
+* {
+  box-sizing: border-box;
+}
+
+.frame1321315411 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-right: 32px;
+  padding-left: 32px;
+  width: 1441px;
+  height: 24px;
+
+  .frame1321314887 {
+    display: inline-flex;
+    flex-shrink: 0;
+    align-items: center;
+    column-gap: 8px;
+
+    .title {
+      flex-shrink: 0;
+      line-height: 24px;
+      letter-spacing: 0.05px;
+      color: var(--Text-color-text-1, #0c0d0e);
+      font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", SimHei, Arial, Helvetica, sans-serif;
+      font-size: 16px;
+      font-weight: 500;
+    }
+
+    .instance {
+      display: inline-flex;
+      flex-shrink: 0;
+      align-items: center;
+      justify-content: center;
+      column-gap: 4px;
+      border-radius: 4px;
+      background: var(--Violet-Tag-violet-2, #f2eafb);
+      padding-right: 6px;
+      padding-left: 6px;
+
+      .success {
+        flex-shrink: 0;
+        line-height: 20px;
+        letter-spacing: 0.04px;
+        color: var(--Violet-violet-6, #6e4c9f);
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", SimHei, Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+
+    .frame {
+      display: inline-flex;
+      flex-shrink: 0;
+      align-items: center;
+      column-gap: 4px;
+      border: 1px solid #a96f1833;
+      border-radius: 4px;
+      padding-right: 7px;
+      padding-left: 7px;
+      overflow: hidden;
+
+      .l3 {
+        flex-shrink: 0;
+        line-height: 18px;
+        letter-spacing: 0.04px;
+        color: #a96f18;
+        font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", SimHei, Arial, Helvetica, sans-serif;
+        font-size: 12px;
+        font-weight: 500;
+      }
+    }
+  }
+
+  .iconWrapper {
+    display: flex;
+    flex-direction: column;
+    flex-shrink: 0;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    box-shadow: var(
+      --shadow-Assembly-Button-Gray-Default-Disabled,
+      0px 0px 0px 1px #dde2e9,
+      0px 2px 1px 0px #00000014
+    );
+    background: var(--Background-color-bg-4, #f6f8fa);
+    padding: 6px;
+    width: 24px;
+    height: 24px;
+    overflow: hidden;
+
+    .icons {
+      flex-shrink: 0;
+      width: 16px;
+      height: 16px;
+      overflow: hidden;
+    }
+  }
+}
