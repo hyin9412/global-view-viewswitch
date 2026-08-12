@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert } from '@tod-m/materials/ve-o';
-import { Dropdown, Menu, Popover } from '@arco-design/web-react';
+import { Button, Drawer, Dropdown, Menu, Popover, Table, Tag } from '@arco-design/web-react';
 import cloudLogo from '../.figma/image/msmz526r-0ev01jt.svg';
 import searchCloseIcon from '../.figma/image/msmz526r-5jix9xc.svg';
 import notificationIcon from '../.figma/image/msmz526r-8ymj99i.svg';
@@ -30,23 +30,41 @@ import sidebarDividerIcon from '../.figma/image/msn809g5-1f8iip1.svg';
 import sidebarFoldIcon from '../.figma/image/msn809g5-edg0sv1.svg';
 import { simpleSiteGroups, siteGroups, type SiteGroup } from './siteVregionDataset';
 
-const schemes = ['方案一', '方案二', '方案三', '方案四', '方案五', '方案六'];
+const schemes = ['最终方案', '方案一', '方案二', '方案三', '方案四', '方案五', '方案六'];
 const dataModes = ['复杂数据', '简单数据'] as const;
 const sidebarModes = ['无侧边栏', '有侧边栏'] as const;
 const VREGION_TAB_GAP = 16;
-const SCHEME_FOUR_MAX_VISIBLE_VREGIONS = 7;
+const SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITH_SIDEBAR = 6;
+const SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITHOUT_SIDEBAR = 7;
 const SCHEME_FOUR_TAB_GAP = 8;
+const FINAL_SCHEME_MAX_PINNED_VREGIONS = 6;
+const DEFAULT_PSM_NAME = 'cp_govern';
 const AGGREGATED_PSMS = [
   {
-    name: 'toutiao.mysql.cp_govern_write',
-    vregions: ['China-East', 'China-Enterprise', 'China-HKPay', 'China-North', 'China-North6', 'China-Pay'],
+    name: DEFAULT_PSM_NAME,
+    vregions: [
+      'China-East',
+      'China-Enterprise',
+      'China-HKPay',
+      'China-North',
+      'China-North6',
+      'China-Pay',
+      'China-Pay2',
+      'Asia-CIS',
+      'Asia-SaaS',
+      'Asia-SouthEastBD',
+      'Australia-SouthEastBD',
+    ],
   },
   {
     name: 'toutiao.mysql.cp_govern_read',
-    vregions: ['US-TTP3', 'US-TTP4'],
+    vregions: ['Europe-WestBD', 'Singapore-SaaS', 'US-Compliance', 'US-EE', 'US-EastBD', 'US-TTP3', 'US-TTP4', 'US-WestBD', 'Europe-CentralBD'],
   },
 ] as const;
 const AGGREGATED_PSM_COUNT = AGGREGATED_PSMS.length;
+const VREGION_TO_PSM = new Map<string, string>(
+  AGGREGATED_PSMS.flatMap((item) => item.vregions.map((vregion) => [vregion, item.name] as const)),
+);
 const primaryNavItems = ['首页', '集群列表', 'Topic', 'Consumer group', 'Mirror', 'Databus', 'GlobalBMQ', '个人工单'] as const;
 
 const featureTabs = [
@@ -92,6 +110,22 @@ type GlobalGroup = SiteGroup & {
 };
 
 type VregionItem = GlobalGroup['vregions'][number];
+type FlatVregionTab = {
+  group: GlobalGroup;
+  item: VregionItem;
+  key: string;
+};
+type EditViewPsmRow = {
+  key: string;
+  psm: string;
+  siteLabels: string[];
+  vregions: string[];
+  vdcCount: number;
+  vdcDetails: Array<{
+    vregion: string;
+    vdcs: string[];
+  }>;
+};
 
 function buildGlobalGroups(groups: SiteGroup[]): GlobalGroup[] {
   return groups.map((group) => ({
@@ -162,6 +196,7 @@ export default function App() {
           </div>
         </div>
 
+        {activeScheme === '最终方案' ? <SchemeFinal groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
         {activeScheme === '方案一' ? <SchemeOne groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
         {activeScheme === '方案二' ? <SchemeTwo groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
         {activeScheme === '方案三' ? <SchemeThree groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
@@ -170,6 +205,36 @@ export default function App() {
         {activeScheme === '方案六' ? <SchemeSix groups={globalGroups} hasSidebar={activeSidebarMode === '有侧边栏'} /> : null}
       </section>
     </main>
+  );
+}
+
+function SchemeFinal({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const defaultActiveSelection = getDefaultGroupSelection(getGroupByLabel(groups, defaultActiveGroupLabel));
+  const [resourceName, setResourceName] = useState(() =>
+    getPsmNameBySelection(defaultActiveGroupLabel, defaultActiveSelection),
+  );
+
+  useEffect(() => {
+    setResourceName(getPsmNameBySelection(defaultActiveGroupLabel, defaultActiveSelection));
+  }, [defaultActiveGroupLabel, defaultActiveSelection.vdc, defaultActiveSelection.vregion, groups]);
+
+  const handleResourceNameChange = useCallback((nextResourceName: string) => {
+    setResourceName(nextResourceName);
+  }, []);
+
+  return (
+    <RdsPage
+      hasSidebar={hasSidebar}
+      resourceName={resourceName}
+      viewFrame={
+        <FinalSchemeGlobalViewFrame
+          groups={groups}
+          hasSidebar={hasSidebar}
+          onResourceNameChange={handleResourceNameChange}
+        />
+      }
+    />
   );
 }
 
@@ -186,7 +251,7 @@ function SchemeThree({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar
 }
 
 function SchemeFour({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
-  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeFourGlobalViewFrame groups={groups} />} />;
+  return <RdsPage hasSidebar={hasSidebar} viewFrame={<SchemeFourGlobalViewFrame groups={groups} hasSidebar={hasSidebar} />} />;
 }
 
 function SchemeFive({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
@@ -217,7 +282,7 @@ function PrimarySidebar() {
   );
 }
 
-function RdsPage({ viewFrame, hasSidebar }: { viewFrame: ReactElement; hasSidebar: boolean }) {
+function RdsPage({ viewFrame, hasSidebar, resourceName = DEFAULT_PSM_NAME }: { viewFrame: ReactElement; hasSidebar: boolean; resourceName?: string }) {
   return (
     <section className="bytecloud-page">
       <header className="cloud-topbar">
@@ -284,7 +349,7 @@ function RdsPage({ viewFrame, hasSidebar }: { viewFrame: ReactElement; hasSideba
             <div className="rds-workspace">
               <div className="resource-header">
                 <div className="resource-left">
-                  <div className="resource-name">cp_govern</div>
+                  <div className="resource-name">{resourceName}</div>
                   <div className="resource-cloud-tag">字节云</div>
                   <div className="resource-level-tag">L3</div>
                 </div>
@@ -787,6 +852,73 @@ function SchemeSixGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
   );
 }
 
+function GlobalFrameActions({ inline = false }: { inline?: boolean }) {
+  return (
+    <div className={`global-frame-actions ${inline ? 'inline' : ''}`}>
+      <button className="square-action" type="button">
+        <img src={starIcon} alt="" />
+      </button>
+      <button className="gray-action" type="button">
+        一致性治理
+      </button>
+      <button className="blue-action" type="button">
+        多区域变更
+        <img src={changeDownIcon} alt="" />
+      </button>
+      <button className="square-action" type="button">
+        <img src={moreIcon} alt="" />
+      </button>
+    </div>
+  );
+}
+
+function MoreVregionDropdown({
+  selectedKeys,
+  onClickMenuItem,
+  onEdit,
+  children,
+}: {
+  selectedKeys: string[];
+  onClickMenuItem: (key: string) => void;
+  onEdit?: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="scheme-four-overflow-dropdown">
+      <div className="scheme-four-overflow-scroll">
+        <Menu className="site-cascade-menu scheme-four-overflow-menu" selectedKeys={selectedKeys} onClickMenuItem={onClickMenuItem}>
+          {children}
+        </Menu>
+      </div>
+      <button className="scheme-four-overflow-edit" type="button" onClick={onEdit}>
+        <EditEntryContent />
+      </button>
+    </div>
+  );
+}
+
+function EditEntryContent() {
+  return (
+    <span className="edit-entry-content">
+      <svg
+        aria-hidden="true"
+        className="edit-entry-icon"
+        fill="none"
+        viewBox="0 0 12 12"
+        xmlns="http://www.w3.org/2000/svg"
+      >
+        <path
+          clipRule="evenodd"
+          d="M4.21744 1.54927C4.30762 1.22465 4.60318 1 4.94008 1H7.06004C7.39695 1 7.69251 1.22465 7.78268 1.54927L8.03834 2.46964L8.9633 2.23084C9.28951 2.14663 9.63185 2.29026 9.8003 2.58203L10.8603 4.41797C11.0287 4.70974 10.982 5.07803 10.7459 5.31843L10.0767 6L10.7459 6.68158C10.982 6.92197 11.0287 7.29026 10.8603 7.58203L9.8003 9.41797C9.63185 9.70974 9.28951 9.85338 8.9633 9.76916L8.03834 9.53036L7.78268 10.4507C7.69251 10.7753 7.39695 11 7.06004 11H4.94008C4.60318 11 4.30762 10.7753 4.21744 10.4507L3.9618 9.53041L3.03702 9.76916C2.71081 9.85338 2.36848 9.70974 2.20003 9.41797L1.14005 7.58203C0.971595 7.29026 1.01837 6.92197 1.25441 6.68158L1.92363 6L1.25441 5.31843C1.01837 5.07803 0.971595 4.70974 1.14005 4.41797L2.20003 2.58203C2.36848 2.29026 2.71082 2.14663 3.03703 2.23084L3.9618 2.46959L4.21744 1.54927ZM3.8961 9.2939L3.89619 9.29423L3.8961 9.2939ZM5.1301 2L4.85962 2.97375C4.75019 3.3677 4.34539 3.60141 3.9495 3.4992L2.97104 3.2466L2.10108 4.75341L2.80915 5.47454C3.0956 5.76629 3.0956 6.23371 2.80915 6.52546L2.10108 7.2466L2.97104 8.75341L3.9495 8.5008C4.34539 8.39859 4.75019 8.63231 4.85962 9.02625L5.1301 10H6.87002L7.14052 9.0262C7.24995 8.63225 7.65475 8.39854 8.05064 8.50075L9.02929 8.75341L9.89924 7.2466L9.19118 6.52546C8.90473 6.23371 8.90473 5.76629 9.19118 5.47454L9.89924 4.75341L9.02929 3.2466L8.05064 3.49925C7.65475 3.60146 7.24995 3.36774 7.14052 2.9738L6.87002 2H5.1301ZM6.00006 5C5.44778 5 5.00006 5.44771 5.00006 6C5.00006 6.55228 5.44778 7 6.00006 7C6.55235 7 7.00006 6.55228 7.00006 6C7.00006 5.44771 6.55235 5 6.00006 5ZM4.00006 6C4.00006 4.89543 4.89549 4 6.00006 4C7.10463 4 8.00006 4.89543 8.00006 6C8.00006 7.10457 7.10463 8 6.00006 8C4.89549 8 4.00006 7.10457 4.00006 6Z"
+          fill="currentColor"
+          fillRule="evenodd"
+        />
+      </svg>
+      <span>编辑视图</span>
+    </span>
+  );
+}
+
 type GroupSelection = {
   vregion: string;
   vdc?: string;
@@ -814,6 +946,12 @@ function buildDefaultGroupSelections(groups: GlobalGroup[]) {
   }, {});
 }
 
+function buildFlatVregionTabs(groups: GlobalGroup[]): FlatVregionTab[] {
+  return groups
+    .filter((group) => group.label !== '全球视图')
+    .flatMap((group) => group.vregions.map((item) => ({ group, item, key: getVregionTabKey(group.label, item.name) })));
+}
+
 function formatGroupPath(group: GlobalGroup, selection: GroupSelection) {
   if (group.label === '全球视图') {
     return group.label;
@@ -834,6 +972,22 @@ function getGroupCount(group: GlobalGroup) {
 
 function getVregionTabKey(groupLabel: string, vregion: string) {
   return `${groupLabel}:${vregion}`;
+}
+
+function getPsmNameByVregion(vregion?: string) {
+  if (!vregion) {
+    return DEFAULT_PSM_NAME;
+  }
+
+  return VREGION_TO_PSM.get(vregion) ?? DEFAULT_PSM_NAME;
+}
+
+function getPsmNameBySelection(groupLabel: string, selection: GroupSelection) {
+  if (groupLabel === '全球视图') {
+    return DEFAULT_PSM_NAME;
+  }
+
+  return getPsmNameByVregion(selection.vregion);
 }
 
 function getSelectionMenuKey(selection: GroupSelection) {
@@ -862,7 +1016,7 @@ function formatVregionTabLabel(item: VregionItem, selection: GroupSelection) {
   return item.name;
 }
 
-function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
+function SchemeFourGlobalViewFrame({ groups, hasSidebar }: { groups: GlobalGroup[]; hasSidebar: boolean }) {
   const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
   const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
   const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
@@ -873,6 +1027,7 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
   const [availableWidth, setAvailableWidth] = useState(0);
   const [tabWidths, setTabWidths] = useState<Record<string, number>>({});
   const [moreWidth, setMoreWidth] = useState(0);
+  const [globalTabWidth, setGlobalTabWidth] = useState(0);
 
   useEffect(() => {
     setActiveGroup(defaultActiveGroupLabel);
@@ -880,10 +1035,17 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
     setOpenMenuTab(null);
   }, [defaultActiveGroupLabel, groups]);
 
+  const globalGroup = groups.find((group) => group.label === '全球视图');
   const flatVregionTabs = useMemo(
-    () => groups.flatMap((group) => group.vregions.map((item) => ({ group, item, key: getVregionTabKey(group.label, item.name) }))),
+    () =>
+      groups
+        .filter((group) => group.label !== '全球视图')
+        .flatMap((group) => group.vregions.map((item) => ({ group, item, key: getVregionTabKey(group.label, item.name) }))),
     [groups],
   );
+  const maxVisibleVregions = hasSidebar
+    ? SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITH_SIDEBAR
+    : SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITHOUT_SIDEBAR;
 
   const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(getGroupByLabel(groups, activeGroup));
   const activeTabKey = getVregionTabKey(activeGroup, activeSelection.vregion);
@@ -919,8 +1081,10 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
     });
 
     const moreTrigger = measureRef.current.querySelector<HTMLElement>('[data-scheme-four-more-trigger]');
+    const globalTrigger = measureRef.current.querySelector<HTMLElement>('[data-scheme-four-global-trigger]');
     setTabWidths(nextTabWidths);
     setMoreWidth(Math.ceil(moreTrigger?.getBoundingClientRect().width ?? 0));
+    setGlobalTabWidth(Math.ceil(globalTrigger?.getBoundingClientRect().width ?? 0));
   }, [activeTabKey, activeSelection, flatVregionTabs]);
 
   const updateActiveSelection = (groupLabel: string, nextSelection: GroupSelection) => {
@@ -932,10 +1096,16 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
     setOpenMenuTab(null);
   };
 
+  const vregionAvailableWidth =
+    availableWidth > 0 && globalGroup
+      ? Math.max(availableWidth - globalTabWidth - (flatVregionTabs.length > 0 ? SCHEME_FOUR_TAB_GAP : 0), 0)
+      : availableWidth;
+
   const { visibleTabs, hiddenTabs } = useMemo(
-    () => getVisibleSchemeFourTabs(flatVregionTabs, activeTabKey, availableWidth, tabWidths, moreWidth),
-    [activeTabKey, availableWidth, flatVregionTabs, moreWidth, tabWidths],
+    () => getVisibleSchemeFourTabs(flatVregionTabs, activeTabKey, vregionAvailableWidth, tabWidths, moreWidth, maxVisibleVregions),
+    [activeTabKey, flatVregionTabs, maxVisibleVregions, moreWidth, tabWidths, vregionAvailableWidth],
   );
+  const moreVregionLabel = `更多 vregion（${hiddenTabs.length}）`;
 
   return (
     <section className="global-view-frame scheme-two">
@@ -958,6 +1128,20 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
           <div className="global-group-row scheme-four">
             <div className="global-group-tabs-area scheme-four" ref={containerRef}>
               <div className="global-group-tabs scheme-four" ref={stripRef}>
+                {globalGroup ? (
+                  <button
+                    className={`site-cascade-tab ${activeGroup === globalGroup.label ? 'selected' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setActiveGroup(globalGroup.label);
+                      setOpenMenuTab(null);
+                    }}
+                  >
+                    <img src={globalGroup.icon} alt="" />
+                    <span className="site-cascade-tab-text">{globalGroup.label}</span>
+                  </button>
+                ) : null}
+
                 {visibleTabs.map(({ group, item, key: tabKey }) => {
                   const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
                   const isActive = activeGroup === group.label && selection.vregion === item.name;
@@ -1013,9 +1197,8 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
                 {hiddenTabs.length > 0 ? (
                   <Dropdown
                     droplist={
-                      <Menu
-                        className="site-cascade-menu scheme-four-overflow-menu"
-                        selectedKeys={[activeTabKey]}
+                      <MoreVregionDropdown
+                        selectedKeys={activeGroup === '全球视图' ? [] : [activeTabKey]}
                         onClickMenuItem={(key) => {
                           const nextTab = flatVregionTabs.find((tab) => tab.key === String(key));
 
@@ -1034,15 +1217,15 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
                             </span>
                           </Menu.Item>
                         ))}
-                      </Menu>
+                      </MoreVregionDropdown>
                     }
                     onVisibleChange={(visible) => setOpenMenuTab(visible ? 'scheme-four-more' : null)}
                     popupVisible={openMenuTab === 'scheme-four-more'}
-                    position="bl"
+                    position="br"
                     trigger="click"
                   >
                     <button className="site-cascade-tab scheme-four-more-tab" type="button">
-                      <span className="site-cascade-tab-text">更多 vregion</span>
+                      <span className="site-cascade-tab-text">{moreVregionLabel}</span>
                       <img className="site-cascade-tab-caret" src={downIcon} alt="" />
                     </button>
                   </Dropdown>
@@ -1050,6 +1233,12 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
               </div>
 
               <div className="vregion-tabs-measure" ref={measureRef} aria-hidden="true">
+                {globalGroup ? (
+                  <span className="site-cascade-tab" data-scheme-four-global-trigger>
+                    <img src={globalGroup.icon} alt="" />
+                    <span className="site-cascade-tab-text">{globalGroup.label}</span>
+                  </span>
+                ) : null}
                 {flatVregionTabs.map(({ group, item, key: tabKey }) => {
                   const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
                   const isActive = tabKey === activeTabKey;
@@ -1076,23 +1265,638 @@ function SchemeFourGlobalViewFrame({ groups }: { groups: GlobalGroup[] }) {
           </div>
         </div>
 
-        <div className="global-frame-actions">
-          <button className="square-action" type="button">
-            <img src={starIcon} alt="" />
-          </button>
-          <button className="gray-action" type="button">
-            一致性治理
-          </button>
-          <button className="blue-action" type="button">
-            多区域变更
-            <img src={changeDownIcon} alt="" />
-          </button>
-          <button className="square-action" type="button">
-            <img src={moreIcon} alt="" />
-          </button>
-        </div>
+        <GlobalFrameActions />
       </div>
     </section>
+  );
+}
+
+function FinalSchemeGlobalViewFrame({
+  groups,
+  hasSidebar,
+  onResourceNameChange,
+}: {
+  groups: GlobalGroup[];
+  hasSidebar: boolean;
+  onResourceNameChange: (resourceName: string) => void;
+}) {
+  const defaultActiveGroupLabel = groups.find((group) => group.label === 'CN')?.label ?? groups[0]?.label ?? '';
+  const [activeGroup, setActiveGroup] = useState(defaultActiveGroupLabel);
+  const [groupSelections, setGroupSelections] = useState<Record<string, GroupSelection>>(() => buildDefaultGroupSelections(groups));
+  const [openMenuTab, setOpenMenuTab] = useState<string | null>(null);
+  const [isEditDrawerVisible, setEditDrawerVisible] = useState(false);
+
+  useEffect(() => {
+    setActiveGroup(defaultActiveGroupLabel);
+    setGroupSelections(buildDefaultGroupSelections(groups));
+    setOpenMenuTab(null);
+  }, [defaultActiveGroupLabel, groups]);
+
+  const globalGroup = groups.find((group) => group.label === '全球视图');
+  const flatVregionTabs = useMemo(() => buildFlatVregionTabs(groups), [groups]);
+  const maxPinnedVregions = hasSidebar ? FINAL_SCHEME_MAX_PINNED_VREGIONS : SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITHOUT_SIDEBAR;
+  const defaultPinnedTabKeys = useMemo(
+    () => flatVregionTabs.slice(0, Math.min(maxPinnedVregions, flatVregionTabs.length)).map((tab) => tab.key),
+    [flatVregionTabs, maxPinnedVregions],
+  );
+  const [pinnedTabKeys, setPinnedTabKeys] = useState<string[]>(defaultPinnedTabKeys);
+
+  const activeSelection = groupSelections[activeGroup] ?? getDefaultGroupSelection(getGroupByLabel(groups, activeGroup));
+  const activeTabKey = getVregionTabKey(activeGroup, activeSelection.vregion);
+  const activeResourceName = getPsmNameBySelection(activeGroup, activeSelection);
+
+  useEffect(() => {
+    onResourceNameChange(activeResourceName);
+  }, [activeResourceName, onResourceNameChange]);
+
+  useEffect(() => {
+    setPinnedTabKeys((currentPinnedTabKeys) => {
+      const availableKeySet = new Set(flatVregionTabs.map((tab) => tab.key));
+      const keptPinnedKeys = currentPinnedTabKeys.filter((key) => availableKeySet.has(key));
+      const fallbackPinnedKeys = defaultPinnedTabKeys.filter((key) => !keptPinnedKeys.includes(key));
+      const nextPinnedKeys = [...keptPinnedKeys, ...fallbackPinnedKeys].slice(0, maxPinnedVregions);
+      return nextPinnedKeys.length > 0 ? nextPinnedKeys : defaultPinnedTabKeys;
+    });
+  }, [defaultPinnedTabKeys, flatVregionTabs, maxPinnedVregions]);
+
+  const updateActiveSelection = (groupLabel: string, nextSelection: GroupSelection) => {
+    setActiveGroup(groupLabel);
+    setGroupSelections((currentSelections) => ({
+      ...currentSelections,
+      [groupLabel]: nextSelection,
+    }));
+    setOpenMenuTab(null);
+  };
+
+  const flatVregionTabMap = useMemo(() => new Map(flatVregionTabs.map((tab) => [tab.key, tab] as const)), [flatVregionTabs]);
+  const visibleTabs = useMemo(
+    () => pinnedTabKeys.map((key) => flatVregionTabMap.get(key)).filter(Boolean) as FlatVregionTab[],
+    [flatVregionTabMap, pinnedTabKeys],
+  );
+  const hiddenTabs = useMemo(() => {
+    const visibleKeySet = new Set(visibleTabs.map((tab) => tab.key));
+    return flatVregionTabs.filter((tab) => !visibleKeySet.has(tab.key));
+  }, [flatVregionTabs, visibleTabs]);
+  const moreVregionLabel = `更多 vregion（${hiddenTabs.length}）`;
+  const openEditDrawer = () => {
+    setOpenMenuTab(null);
+    setEditDrawerVisible(true);
+  };
+  const handleSavePinnedTabs = (nextPinnedTabKeys: string[]) => {
+    const nextVisibleTabKeys = nextPinnedTabKeys.filter((key) => flatVregionTabMap.has(key)).slice(0, maxPinnedVregions);
+    setPinnedTabKeys(nextVisibleTabKeys);
+    setEditDrawerVisible(false);
+
+    if (activeGroup === '全球视图' || nextVisibleTabKeys.includes(activeTabKey)) {
+      return;
+    }
+
+    const nextVisibleTab = nextVisibleTabKeys.map((key) => flatVregionTabMap.get(key)).find(Boolean);
+
+    if (nextVisibleTab) {
+      updateActiveSelection(nextVisibleTab.group.label, getDefaultVregionSelection(nextVisibleTab.item));
+      return;
+    }
+
+    if (globalGroup) {
+      setActiveGroup(globalGroup.label);
+    }
+  };
+
+  return (
+    <section className="global-view-frame scheme-two scheme-final">
+      <div className="global-view-content">
+        <div className="global-view-main">
+          <div className="global-frame-topbar">
+            <CompactBreadcrumb onEdit={openEditDrawer} />
+            <GlobalFrameActions inline />
+          </div>
+
+          <div className="global-group-row scheme-four">
+            <div className="global-group-tabs-area scheme-four">
+              <div className="global-group-tabs scheme-four">
+                {globalGroup ? (
+                  <button
+                    className={`site-cascade-tab ${activeGroup === globalGroup.label ? 'selected' : ''}`}
+                    type="button"
+                    onClick={() => {
+                      setActiveGroup(globalGroup.label);
+                      setOpenMenuTab(null);
+                    }}
+                  >
+                    <img src={globalGroup.icon} alt="" />
+                    <span className="site-cascade-tab-text">{globalGroup.label}</span>
+                  </button>
+                ) : null}
+
+                {visibleTabs.map(({ group, item, key: tabKey }) => {
+                  const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
+                  const isActive = activeGroup === group.label && selection.vregion === item.name;
+                  const hasVdcs = item.vdcs.length > 0;
+                  const tabLabel = isActive ? formatVregionTabLabel(item, selection) : item.name;
+                  const tabButton = (
+                    <button
+                      className={`site-cascade-tab ${isActive ? 'selected' : ''}`}
+                      key={tabKey}
+                      type="button"
+                      onClick={
+                        !isActive || item.vdcs.length === 0
+                          ? () => updateActiveSelection(group.label, getDefaultVregionSelection(item))
+                          : undefined
+                      }
+                    >
+                      <img src={group.icon} alt="" />
+                      <span className="site-cascade-tab-text">{tabLabel}</span>
+                      {isActive && hasVdcs ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+                    </button>
+                  );
+
+                  if (!isActive || item.vdcs.length === 0) {
+                    return tabButton;
+                  }
+
+                  return (
+                    <Dropdown
+                      droplist={
+                        <Menu
+                          className="site-cascade-menu"
+                          selectedKeys={[selection.vdc ?? item.vdcs[0]]}
+                          onClickMenuItem={(key) => {
+                            updateActiveSelection(group.label, { vregion: item.name, vdc: String(key) });
+                          }}
+                        >
+                          {item.vdcs.map((vdc) => (
+                            <Menu.Item key={vdc}>{vdc}</Menu.Item>
+                          ))}
+                        </Menu>
+                      }
+                      key={tabKey}
+                      onVisibleChange={(visible) => setOpenMenuTab(visible ? tabKey : null)}
+                      popupVisible={openMenuTab === tabKey}
+                      position="bl"
+                      trigger="click"
+                    >
+                      {tabButton}
+                    </Dropdown>
+                  );
+                })}
+
+                {hiddenTabs.length > 0 ? (
+                  <Dropdown
+                    droplist={
+                      <MoreVregionDropdown
+                        selectedKeys={activeGroup === '全球视图' ? [] : [activeTabKey]}
+                        onEdit={openEditDrawer}
+                        onClickMenuItem={(key) => {
+                          const nextTab = flatVregionTabs.find((tab) => tab.key === String(key));
+
+                          if (!nextTab) {
+                            return;
+                          }
+
+                          updateActiveSelection(nextTab.group.label, getDefaultVregionSelection(nextTab.item));
+                        }}
+                      >
+                        {hiddenTabs.map((tab) => (
+                          <Menu.Item key={tab.key}>
+                            <span className="scheme-four-overflow-item">
+                              <img src={tab.group.icon} alt="" />
+                              <span>{tab.item.name}</span>
+                            </span>
+                          </Menu.Item>
+                        ))}
+                      </MoreVregionDropdown>
+                    }
+                    onVisibleChange={(visible) => setOpenMenuTab(visible ? 'final-scheme-more' : null)}
+                    popupVisible={openMenuTab === 'final-scheme-more'}
+                    position="br"
+                    trigger="click"
+                  >
+                    <button className="site-cascade-tab scheme-four-more-tab" type="button">
+                      <span className="site-cascade-tab-text">{moreVregionLabel}</span>
+                      <img className="site-cascade-tab-caret" src={downIcon} alt="" />
+                    </button>
+                  </Dropdown>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <FinalSchemeEditDrawer
+        flatVregionTabs={flatVregionTabs}
+        groups={groups}
+        maxPinnedVregions={maxPinnedVregions}
+        pinnedTabKeys={pinnedTabKeys}
+        visible={isEditDrawerVisible}
+        onCancel={() => setEditDrawerVisible(false)}
+        onSave={handleSavePinnedTabs}
+      />
+    </section>
+  );
+}
+
+function FinalSchemeEditDrawer({
+  visible,
+  groups,
+  flatVregionTabs,
+  pinnedTabKeys,
+  maxPinnedVregions,
+  onCancel,
+  onSave,
+}: {
+  visible: boolean;
+  groups: GlobalGroup[];
+  flatVregionTabs: FlatVregionTab[];
+  pinnedTabKeys: string[];
+  maxPinnedVregions: number;
+  onCancel: () => void;
+  onSave: (nextPinnedTabKeys: string[]) => void;
+}) {
+  const [draftPinnedTabKeys, setDraftPinnedTabKeys] = useState<string[]>(pinnedTabKeys);
+  const [leftKeyword, setLeftKeyword] = useState('');
+  const [rightKeyword, setRightKeyword] = useState('');
+  const [draggingKey, setDraggingKey] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!visible) {
+      return;
+    }
+
+    setDraftPinnedTabKeys(pinnedTabKeys);
+    setLeftKeyword('');
+    setRightKeyword('');
+    setDraggingKey(null);
+  }, [pinnedTabKeys, visible]);
+
+  const flatVregionTabMap = useMemo(() => new Map(flatVregionTabs.map((tab) => [tab.key, tab] as const)), [flatVregionTabs]);
+  const draftPinnedKeySet = useMemo(() => new Set(draftPinnedTabKeys), [draftPinnedTabKeys]);
+  const filteredGroups = useMemo(() => {
+    const keyword = leftKeyword.trim().toLowerCase();
+
+    return groups
+      .filter((group) => group.label !== '全球视图')
+      .map((group) => ({
+        ...group,
+        vregions: group.vregions.filter((item) => item.name.toLowerCase().includes(keyword)),
+      }))
+      .filter((group) => group.vregions.length > 0);
+  }, [groups, leftKeyword]);
+  const selectedTabs = useMemo(
+    () => draftPinnedTabKeys.map((key) => flatVregionTabMap.get(key)).filter(Boolean) as FlatVregionTab[],
+    [draftPinnedTabKeys, flatVregionTabMap],
+  );
+  const filteredSelectedTabs = useMemo(() => {
+    const keyword = rightKeyword.trim().toLowerCase();
+
+    if (!keyword) {
+      return selectedTabs;
+    }
+
+    return selectedTabs.filter((tab) => tab.item.name.toLowerCase().includes(keyword));
+  }, [rightKeyword, selectedTabs]);
+  const editViewPsmRows = useMemo<EditViewPsmRow[]>(
+    () =>
+      AGGREGATED_PSMS.map((item) => {
+        const siteLabels = groups
+          .filter(
+            (group) =>
+              group.label !== '全球视图' &&
+              group.vregions.some((vregion) => item.vregions.some((psmVregion) => psmVregion === vregion.name)),
+          )
+          .map((group) => group.label);
+        const vdcDetails = groups
+          .flatMap((group) =>
+            group.vregions
+              .filter((vregion) => item.vregions.some((psmVregion) => psmVregion === vregion.name) && vregion.vdcs.length > 0)
+              .map((vregion) => ({
+                vregion: vregion.name,
+                vdcs: vregion.vdcs,
+              })),
+          )
+          .filter((detail, index, currentDetails) => currentDetails.findIndex((itemDetail) => itemDetail.vregion === detail.vregion) === index);
+        const vdcCount = vdcDetails.reduce((sum, detail) => sum + detail.vdcs.length, 0);
+
+        return {
+          key: item.name,
+          psm: item.name,
+          siteLabels,
+          vregions: [...item.vregions],
+          vdcCount,
+          vdcDetails,
+        };
+      }),
+    [groups],
+  );
+
+  const getVisibleTagItems = (items: string[], maxUnits: number) => {
+    let usedUnits = 0;
+    const visibleItems: string[] = [];
+
+    items.forEach((item) => {
+      const nextUnits = Math.max(item.length, 4) + 2;
+
+      if (visibleItems.length > 0 && usedUnits + nextUnits > maxUnits) {
+        return;
+      }
+
+      if (visibleItems.length === 0 || usedUnits + nextUnits <= maxUnits) {
+        visibleItems.push(item);
+        usedUnits += nextUnits;
+      }
+    });
+
+    return {
+      visibleItems,
+      hiddenCount: Math.max(items.length - visibleItems.length, 0),
+    };
+  };
+
+  const renderLinearTags = (items: string[], maxUnits: number, label: 'site' | 'vregion') => {
+    const { visibleItems, hiddenCount } = getVisibleTagItems(items, maxUnits);
+    const summaryText = label === 'site' ? `共 ${items.length} 个 site` : `共 ${items.length} 个 Vregion`;
+
+    return (
+      <span className="edit-view-linear-tags">
+        {visibleItems.map((item) => (
+          <Tag className="edit-view-linear-tag" key={item}>
+            {item}
+          </Tag>
+        ))}
+        {hiddenCount > 0 ? (
+          <Popover
+            className="edit-view-linear-tags-popover-wrapper"
+            content={
+              <div className="edit-view-linear-tags-popover">
+                <div className="edit-view-linear-tags-popover-title">{summaryText}</div>
+                {items.map((item) => (
+                  <div className="edit-view-linear-tags-popover-item" key={`popover:${item}`}>
+                    {item}
+                  </div>
+                ))}
+              </div>
+            }
+            getPopupContainer={() => document.body}
+            position="top"
+            trigger="hover"
+          >
+            <Tag className="edit-view-linear-tag">+{hiddenCount}</Tag>
+          </Popover>
+        ) : null}
+      </span>
+    );
+  };
+
+  const updateDraftPinnedTabs = (nextPinnedTabKeys: string[]) => {
+    setDraftPinnedTabKeys(nextPinnedTabKeys.slice(0, maxPinnedVregions));
+  };
+
+  const togglePinnedTab = (tabKey: string, checked: boolean) => {
+    setDraftPinnedTabKeys((currentPinnedTabKeys) => {
+      if (checked) {
+        if (currentPinnedTabKeys.includes(tabKey) || currentPinnedTabKeys.length >= maxPinnedVregions) {
+          return currentPinnedTabKeys;
+        }
+
+        return [...currentPinnedTabKeys, tabKey];
+      }
+
+      return currentPinnedTabKeys.filter((key) => key !== tabKey);
+    });
+  };
+
+  const handleDropPinnedTab = (targetKey: string) => {
+    if (!draggingKey || draggingKey === targetKey) {
+      return;
+    }
+
+    setDraftPinnedTabKeys((currentPinnedTabKeys) => {
+      const fromIndex = currentPinnedTabKeys.indexOf(draggingKey);
+      const targetIndex = currentPinnedTabKeys.indexOf(targetKey);
+
+      if (fromIndex === -1 || targetIndex === -1) {
+        return currentPinnedTabKeys;
+      }
+
+      const nextPinnedTabKeys = [...currentPinnedTabKeys];
+      const [draggingTabKey] = nextPinnedTabKeys.splice(fromIndex, 1);
+      nextPinnedTabKeys.splice(targetIndex, 0, draggingTabKey);
+      return nextPinnedTabKeys;
+    });
+    setDraggingKey(null);
+  };
+
+  const editViewPsmColumns = [
+    {
+      title: 'PSM',
+      dataIndex: 'psm',
+      width: 260,
+    },
+    {
+      title: 'Site',
+      dataIndex: 'siteLabels',
+      width: 220,
+      render: (_: string, record: EditViewPsmRow) => renderLinearTags(record.siteLabels, 18, 'site'),
+    },
+    {
+      title: 'Vregion',
+      dataIndex: 'vregions',
+      render: (_: string, record: EditViewPsmRow) => renderLinearTags(record.vregions, 30, 'vregion'),
+    },
+    {
+      title: 'VDC',
+      dataIndex: 'vdcCount',
+      width: 120,
+      render: (_: number, record: EditViewPsmRow) =>
+        record.vdcCount > 0 ? (
+          <Popover
+            content={
+              <div className="edit-view-vdc-popover">
+                {record.vdcDetails.map((detail) => (
+                  <div className="edit-view-vdc-popover-row" key={`${record.key}:${detail.vregion}`}>
+                    <span className="edit-view-vdc-popover-vregion">{detail.vregion}</span>
+                    <span className="edit-view-vdc-popover-vdcs">{detail.vdcs.join(', ')}</span>
+                  </div>
+                ))}
+              </div>
+            }
+            position="top"
+            trigger="hover"
+          >
+            <Tag bordered={false} className="edit-view-vdc-tag">
+              {record.vdcCount}个
+            </Tag>
+          </Popover>
+        ) : (
+          '-'
+        ),
+    },
+    {
+      title: '操作',
+      dataIndex: 'action',
+      render: () => <button className="edit-view-remove-button" type="button">移除</button>,
+    },
+  ];
+  const isSaveDisabled = draftPinnedTabKeys.length === 0;
+
+  return (
+    <Drawer
+      className="final-scheme-edit-drawer"
+      footer={
+        <div className="final-scheme-edit-footer">
+          <Button onClick={onCancel}>取消</Button>
+          <Popover
+            content="未选择任何常驻Tab 栏的Vregion"
+            disabled={!isSaveDisabled}
+            position="top"
+            trigger="hover"
+          >
+            <span className="final-scheme-save-trigger">
+              <Button disabled={isSaveDisabled} type="primary" onClick={() => onSave(draftPinnedTabKeys)}>
+                保存
+              </Button>
+            </span>
+          </Popover>
+        </div>
+      }
+      maskClosable
+      onCancel={onCancel}
+      title="编辑视图"
+      visible={visible}
+      width={1120}
+    >
+      <div className="final-scheme-edit-body">
+        <section className="edit-view-psm-section">
+          <div className="edit-view-psm-header">
+            <p className="edit-view-psm-count">已添加 PSM：{editViewPsmRows.length}条</p>
+            <button className="edit-view-add-psm" type="button">
+              <span className="edit-view-add-psm-icon">+</span>
+              <span>添加 PSM</span>
+            </button>
+          </div>
+
+          <Table
+            borderCell
+            className="edit-view-psm-table"
+            columns={editViewPsmColumns}
+            data={editViewPsmRows}
+            pagination={false}
+            rowKey="key"
+          />
+        </section>
+
+        <section className="edit-view-transfer-section">
+          <div className="edit-view-transfer-title">
+            <span className="edit-view-transfer-title-bar" />
+            <span>配置常驻 Tab 栏的 Vregion</span>
+          </div>
+
+          <div className="edit-view-transfer-shell">
+            <div className="edit-view-transfer-panel">
+              <div className="edit-view-transfer-panel-header">
+                <span className="edit-view-transfer-panel-title">全部 Vregion</span>
+                <button
+                  className="edit-view-transfer-icon-button"
+                  type="button"
+                  onClick={() => {
+                    setLeftKeyword('');
+                    setRightKeyword('');
+                    updateDraftPinnedTabs(pinnedTabKeys);
+                  }}
+                >
+                  ↻
+                </button>
+              </div>
+
+              <label className="edit-view-search">
+                <img src={searchIcon} alt="" />
+                <input
+                  placeholder="请输入"
+                  type="text"
+                  value={leftKeyword}
+                  onChange={(event) => setLeftKeyword(event.target.value)}
+                />
+              </label>
+
+              <div className="edit-view-transfer-list">
+                {filteredGroups.map((group) => (
+                  <div className="edit-view-transfer-group" key={group.label}>
+                    <div className="edit-view-transfer-group-header">
+                      <img src={group.icon} alt="" />
+                      <span>{group.label}</span>
+                      <span>({group.vregions.length})</span>
+                    </div>
+
+                    <div className="edit-view-transfer-group-items">
+                      {group.vregions.map((item) => {
+                        const tabKey = getVregionTabKey(group.label, item.name);
+                        const checked = draftPinnedKeySet.has(tabKey);
+                        const disabled = !checked && draftPinnedTabKeys.length >= maxPinnedVregions;
+
+                        return (
+                          <label className={`edit-view-transfer-option ${disabled ? 'disabled' : ''}`} key={tabKey}>
+                            <input
+                              checked={checked}
+                              disabled={disabled}
+                              type="checkbox"
+                              onChange={(event) => togglePinnedTab(tabKey, event.target.checked)}
+                            />
+                            <span>{item.name}</span>
+                          </label>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="edit-view-transfer-panel right">
+              <div className="edit-view-transfer-panel-header">
+                <span className="edit-view-transfer-panel-title">
+                  已选 Vregion：{draftPinnedTabKeys.length}/{maxPinnedVregions} 项
+                </span>
+                <button className="edit-view-transfer-icon-button" type="button" onClick={() => updateDraftPinnedTabs([])}>
+                  🗑
+                </button>
+              </div>
+
+              <label className="edit-view-search">
+                <img src={searchIcon} alt="" />
+                <input
+                  placeholder="请输入"
+                  type="text"
+                  value={rightKeyword}
+                  onChange={(event) => setRightKeyword(event.target.value)}
+                />
+              </label>
+
+              <div className="edit-view-selected-list">
+                {filteredSelectedTabs.map((tab) => (
+                  <div
+                    className="edit-view-selected-item"
+                    draggable
+                    key={tab.key}
+                    onDragEnd={() => setDraggingKey(null)}
+                    onDragOver={(event) => event.preventDefault()}
+                    onDragStart={() => setDraggingKey(tab.key)}
+                    onDrop={() => handleDropPinnedTab(tab.key)}
+                  >
+                    <div className="edit-view-selected-item-main">
+                      <span className="edit-view-drag-handle">⋮⋮</span>
+                      <span>{tab.item.name}</span>
+                    </div>
+                    <button className="edit-view-selected-remove" type="button" onClick={() => togglePinnedTab(tab.key, false)}>
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      </div>
+    </Drawer>
   );
 }
 
@@ -1114,8 +1918,9 @@ function getVisibleSchemeFourTabs(
   availableWidth: number,
   widths: Record<string, number>,
   moreWidth: number,
+  maxVisibleVregions: number,
 ) {
-  const fallbackVisibleTabs = flatVregionTabs.slice(0, Math.min(SCHEME_FOUR_MAX_VISIBLE_VREGIONS, flatVregionTabs.length));
+  const fallbackVisibleTabs = flatVregionTabs.slice(0, Math.min(maxVisibleVregions, flatVregionTabs.length));
 
   if (flatVregionTabs.length === 0) {
     return { visibleTabs: [] as typeof flatVregionTabs, hiddenTabs: [] as typeof flatVregionTabs };
@@ -1128,7 +1933,7 @@ function getVisibleSchemeFourTabs(
     };
   }
 
-  let candidateTabs = flatVregionTabs.slice(0, Math.min(SCHEME_FOUR_MAX_VISIBLE_VREGIONS, flatVregionTabs.length));
+  let candidateTabs = flatVregionTabs.slice(0, Math.min(maxVisibleVregions, flatVregionTabs.length));
   const activeTab = flatVregionTabs.find((tab) => tab.key === activeTabKey);
 
   if (activeTab && !candidateTabs.some((tab) => tab.key === activeTabKey)) {
@@ -1178,7 +1983,7 @@ function getVisibleSchemeFourTabs(
   return { visibleTabs: [] as typeof flatVregionTabs, hiddenTabs: flatVregionTabs };
 }
 
-function CompactBreadcrumb() {
+function CompactBreadcrumb({ onEdit }: { onEdit?: () => void }) {
   return (
     <div className="breadcrumb-compact-row">
       <div className="breadcrumb-line">
@@ -1203,6 +2008,9 @@ function CompactBreadcrumb() {
                 </div>
               ))}
             </div>
+            <button className="aggregate-psm-popover-edit" type="button" onClick={onEdit}>
+              <EditEntryContent />
+            </button>
           </div>
         }
         position="bottom"
@@ -1755,7 +2563,7 @@ function VregionTabs({
                 ))}
               </Menu>
             }
-            position="bl"
+            position="br"
             trigger="click"
           >
             <button className={`more-vregion ${visibleVregions.length > 0 ? 'with-divider' : ''}`} type="button">
@@ -1903,8 +2711,7 @@ function SchemeSixVregionTabs({
         {hiddenVregions.length > 0 ? (
           <Dropdown
             droplist={
-              <Menu
-                className="site-cascade-menu scheme-four-overflow-menu"
+              <MoreVregionDropdown
                 selectedKeys={[activeVregion]}
                 onClickMenuItem={(key) => {
                   const item = vregions.find((vregion) => vregion.name === String(key));
@@ -1914,7 +2721,7 @@ function SchemeSixVregionTabs({
                 {hiddenVregions.map((tab) => (
                   <Menu.Item key={tab}>{tab}</Menu.Item>
                 ))}
-              </Menu>
+              </MoreVregionDropdown>
             }
             onVisibleChange={(visible) => setOpenMenuTab(visible ? 'scheme-six-more' : null)}
             popupVisible={openMenuTab === 'scheme-six-more'}
