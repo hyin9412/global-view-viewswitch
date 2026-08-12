@@ -33,6 +33,8 @@ import { simpleSiteGroups, siteGroups, type SiteGroup } from './siteVregionDatas
 const schemes = ['最终方案', '方案一', '方案二', '方案三', '方案四', '方案五', '方案六'];
 const dataModes = ['复杂数据', '简单数据'] as const;
 const sidebarModes = ['无侧边栏', '有侧边栏'] as const;
+const FINAL_SCHEME_INTERACTIONS_DOC_URL =
+  'https://github.com/hyin9412/global-view-viewswitch/blob/main/docs/final_scheme_interactions.md';
 const VREGION_TAB_GAP = 16;
 const SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITH_SIDEBAR = 6;
 const SCHEME_FOUR_MAX_VISIBLE_VREGIONS_WITHOUT_SIDEBAR = 7;
@@ -153,6 +155,13 @@ export default function App() {
   const [activeSidebarMode, setActiveSidebarMode] = useState<(typeof sidebarModes)[number]>(sidebarModes[0]);
   const [isFinalArchiveVisible, setFinalArchiveVisible] = useState(false);
   const [previewWidth, setPreviewWidth] = useState(1440);
+  const handleSchemeChange = (scheme: string) => {
+    setActiveScheme(scheme);
+
+    if (scheme !== '最终方案') {
+      setFinalArchiveVisible(false);
+    }
+  };
   const globalGroups = useMemo(
     () => buildGlobalGroups(activeDataMode === '复杂数据' ? siteGroups : simpleSiteGroups),
     [activeDataMode],
@@ -162,85 +171,111 @@ export default function App() {
     <main className="page">
       <section className="panel">
         <div className="top-selectors">
-          <div className="scheme-selector" aria-label="方案选择器">
-            <div className="scheme-selector-buttons">
-              {schemes.map((scheme) => (
-                <button
-                  className={`scheme-button ${activeScheme === scheme ? 'active' : ''}`}
-                  key={scheme}
-                  type="button"
-                  onClick={() => {
-                    setActiveScheme(scheme);
+          <div className="settings-panel" aria-label="配置内容">
+            <div className="settings-panel-title">配置内容</div>
 
-                    if (scheme !== '最终方案') {
-                      setFinalArchiveVisible(false);
-                    }
-                  }}
+            <div className="settings-panel-body">
+              <div className="settings-field">
+                <span className="settings-field-label">方案</span>
+                <label className="scheme-select-field">
+                  <select value={activeScheme} onChange={(event) => handleSchemeChange(event.target.value)}>
+                    {schemes.map((scheme) => (
+                      <option key={scheme} value={scheme}>
+                        {scheme}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+
+              <div className="settings-field">
+                <span className="settings-field-label">数据</span>
+                <div className="pipe-tabs" aria-label="数据选择器">
+                  {dataModes.map((mode, index) => (
+                    <div className="pipe-tab-item" key={mode}>
+                      <button
+                        className={`pipe-tab-button ${activeDataMode === mode ? 'active' : ''}`}
+                        type="button"
+                        onClick={() => setActiveDataMode(mode)}
+                      >
+                        {mode}
+                      </button>
+                      {index < dataModes.length - 1 ? <span className="pipe-tab-divider">|</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="settings-field">
+                <span className="settings-field-label">侧边栏</span>
+                <div className="pipe-tabs" aria-label="侧边栏选择器">
+                  {sidebarModes.map((mode, index) => (
+                    <div className="pipe-tab-item" key={mode}>
+                      <button
+                        className={`pipe-tab-button ${activeSidebarMode === mode ? 'active' : ''}`}
+                        type="button"
+                        onClick={() => setActiveSidebarMode(mode)}
+                      >
+                        {mode}
+                      </button>
+                      {index < sidebarModes.length - 1 ? <span className="pipe-tab-divider">|</span> : null}
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {activeScheme === '最终方案' ? (
+                <div className="settings-field">
+                  <span className="settings-field-label">视图</span>
+                  <button className="final-scheme-archive-entry" type="button" onClick={() => setFinalArchiveVisible(true)}>
+                    展示编辑视图archive
+                  </button>
+                </div>
+              ) : null}
+
+              <div className="settings-field">
+                <span className="settings-field-label">交互说明</span>
+                <a
+                  className="final-scheme-archive-entry"
+                  href={FINAL_SCHEME_INTERACTIONS_DOC_URL}
+                  rel="noreferrer"
+                  target="_blank"
                 >
-                  {scheme}
-                </button>
-              ))}
-            </div>
-            {activeScheme === '最终方案' ? (
-              <button className="final-scheme-archive-entry" type="button" onClick={() => setFinalArchiveVisible(true)}>
-                <SettingsEntryContent label="编辑视图（Archive）" />
-              </button>
-            ) : null}
-          </div>
+                  查看 markdown 文件
+                </a>
+              </div>
 
-          <div className="data-selector" aria-label="数据选择器">
-            {dataModes.map((mode) => (
-              <button
-                className={`data-button ${activeDataMode === mode ? 'active' : ''}`}
-                key={mode}
-                type="button"
-                onClick={() => setActiveDataMode(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
-          <div className="sidebar-selector" aria-label="侧边栏选择器">
-            {sidebarModes.map((mode) => (
-              <button
-                className={`sidebar-button ${activeSidebarMode === mode ? 'active' : ''}`}
-                key={mode}
-                type="button"
-                onClick={() => setActiveSidebarMode(mode)}
-              >
-                {mode}
-              </button>
-            ))}
-          </div>
-
-          <label className="preview-width-selector" aria-label="屏幕宽度设置">
-            <span className="preview-width-label">屏幕宽度</span>
-            <div className="preview-width-slider-wrap">
-              <span className="preview-width-boundary">1280</span>
-              <input
-                max={1920}
-                min={1280}
-                step={1}
-                type="range"
-                value={previewWidth}
-                onChange={(event) => setPreviewWidth(Number(event.target.value))}
-              />
-              <span className="preview-width-boundary">1920</span>
+              <div className="settings-field settings-field-width">
+                <label className="preview-width-selector" aria-label="屏幕宽度设置">
+                  <span className="preview-width-label">屏幕宽度</span>
+                  <div className="preview-width-slider-wrap">
+                    <span className="preview-width-boundary">1280</span>
+                    <input
+                      max={1920}
+                      min={1280}
+                      step={1}
+                      type="range"
+                      value={previewWidth}
+                      onChange={(event) => setPreviewWidth(Number(event.target.value))}
+                    />
+                    <span className="preview-width-boundary">1920</span>
+                  </div>
+                  <div className="preview-width-value">{previewWidth}px</div>
+                  <div className="preview-width-value-mobile">{previewWidth}px</div>
+                  <div className="preview-width-slider-mobile">
+                    <input
+                      max={1920}
+                      min={1280}
+                      step={1}
+                      type="range"
+                      value={previewWidth}
+                      onChange={(event) => setPreviewWidth(Number(event.target.value))}
+                    />
+                  </div>
+                </label>
+              </div>
             </div>
-            <div className="preview-width-value">{previewWidth}px</div>
-            <div className="preview-width-value-mobile">{previewWidth}px</div>
-            <div className="preview-width-slider-mobile">
-              <input
-                max={1920}
-                min={1280}
-                step={1}
-                type="range"
-                value={previewWidth}
-                onChange={(event) => setPreviewWidth(Number(event.target.value))}
-              />
-            </div>
-          </label>
+        </div>
         </div>
 
         <div className="scheme-preview-stage">
@@ -2113,7 +2148,7 @@ function FinalSchemeEditDrawer({
       }
       maskClosable
       onCancel={onCancel}
-      title="编辑视图（Archive）"
+      title="展示编辑视图archive"
       visible={visible}
       width={1120}
     >
