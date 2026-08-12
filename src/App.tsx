@@ -1446,6 +1446,13 @@ function FinalSchemeGlobalViewFrame({
   const [openMenuTab, setOpenMenuTab] = useState<string | null>(null);
   const [isManagePsmVisible, setManagePsmVisible] = useState(false);
   const [isCustomTabsVisible, setCustomTabsVisible] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const stripRef = useRef<HTMLDivElement>(null);
+  const measureRef = useRef<HTMLDivElement>(null);
+  const [availableWidth, setAvailableWidth] = useState(0);
+  const [tabWidths, setTabWidths] = useState<Record<string, number>>({});
+  const [moreWidth, setMoreWidth] = useState(0);
+  const [globalTabWidth, setGlobalTabWidth] = useState(0);
 
   useEffect(() => {
     setActiveGroup(defaultActiveGroupLabel);
@@ -1471,6 +1478,23 @@ function FinalSchemeGlobalViewFrame({
   const activeResourceName = getPsmNameBySelection(activeGroup, activeSelection);
 
   useEffect(() => {
+    if (!containerRef.current) {
+      return undefined;
+    }
+
+    const updateWidth = () => {
+      setAvailableWidth(Math.floor(stripRef.current?.getBoundingClientRect().width ?? 0));
+    };
+
+    updateWidth();
+
+    const resizeObserver = new ResizeObserver(updateWidth);
+    resizeObserver.observe(containerRef.current);
+
+    return () => resizeObserver.disconnect();
+  }, []);
+
+  useEffect(() => {
     onResourceNameChange(activeResourceName);
   }, [activeResourceName, onResourceNameChange]);
 
@@ -1494,6 +1518,26 @@ function FinalSchemeGlobalViewFrame({
     previousMaxPinnedVregionsRef.current = maxPinnedVregions;
   }, [maxPinnedVregions, onResponsivePinnedMessage, pinnedTabKeys.length]);
 
+  useEffect(() => {
+    if (!measureRef.current) {
+      return;
+    }
+
+    const nextTabWidths: Record<string, number> = {};
+    measureRef.current.querySelectorAll<HTMLElement>('[data-final-scheme-tab-key]').forEach((element) => {
+      const tabKey = element.dataset.finalSchemeTabKey;
+      if (tabKey) {
+        nextTabWidths[tabKey] = Math.ceil(element.getBoundingClientRect().width);
+      }
+    });
+
+    const moreTrigger = measureRef.current.querySelector<HTMLElement>('[data-final-scheme-more-trigger]');
+    const globalTrigger = measureRef.current.querySelector<HTMLElement>('[data-final-scheme-global-trigger]');
+    setTabWidths(nextTabWidths);
+    setMoreWidth(Math.ceil(moreTrigger?.getBoundingClientRect().width ?? 0));
+    setGlobalTabWidth(Math.ceil(globalTrigger?.getBoundingClientRect().width ?? 0));
+  }, [activeTabKey, activeSelection, flatVregionTabs]);
+
   const updateActiveSelection = (groupLabel: string, nextSelection: GroupSelection) => {
     setActiveGroup(groupLabel);
     setGroupSelections((currentSelections) => ({
@@ -1504,14 +1548,22 @@ function FinalSchemeGlobalViewFrame({
   };
 
   const flatVregionTabMap = useMemo(() => new Map(flatVregionTabs.map((tab) => [tab.key, tab] as const)), [flatVregionTabs]);
-  const visibleTabs = useMemo(
-    () => pinnedTabKeys.slice(0, maxPinnedVregions).map((key) => flatVregionTabMap.get(key)).filter(Boolean) as FlatVregionTab[],
-    [flatVregionTabMap, maxPinnedVregions, pinnedTabKeys],
+  const orderedTabs = useMemo(() => {
+    const pinnedTabs = pinnedTabKeys
+      .map((key) => flatVregionTabMap.get(key))
+      .filter(Boolean) as FlatVregionTab[];
+    const pinnedKeySet = new Set(pinnedTabs.map((tab) => tab.key));
+    const remainingTabs = flatVregionTabs.filter((tab) => !pinnedKeySet.has(tab.key));
+    return [...pinnedTabs, ...remainingTabs];
+  }, [flatVregionTabMap, flatVregionTabs, pinnedTabKeys]);
+  const vregionAvailableWidth =
+    availableWidth > 0 && globalGroup
+      ? Math.max(availableWidth - globalTabWidth - (orderedTabs.length > 0 ? SCHEME_FOUR_TAB_GAP : 0), 0)
+      : availableWidth;
+  const { visibleTabs, hiddenTabs } = useMemo(
+    () => getVisibleSchemeFourTabs(orderedTabs, activeTabKey, vregionAvailableWidth, tabWidths, moreWidth, maxPinnedVregions),
+    [activeTabKey, maxPinnedVregions, moreWidth, orderedTabs, tabWidths, vregionAvailableWidth],
   );
-  const hiddenTabs = useMemo(() => {
-    const visibleKeySet = new Set(visibleTabs.map((tab) => tab.key));
-    return flatVregionTabs.filter((tab) => !visibleKeySet.has(tab.key));
-  }, [flatVregionTabs, visibleTabs]);
   const moreVregionLabel = `更多 vregion（${hiddenTabs.length}）`;
   const openCustomTabsModal = () => {
     setOpenMenuTab(null);
@@ -1548,8 +1600,8 @@ function FinalSchemeGlobalViewFrame({
           </div>
 
           <div className="global-group-row scheme-four">
-            <div className="global-group-tabs-area scheme-four">
-              <div className="global-group-tabs scheme-four">
+            <div className="global-group-tabs-area scheme-four" ref={containerRef}>
+              <div className="global-group-tabs scheme-four" ref={stripRef}>
                 {globalGroup ? (
                   <button
                     className={`site-cascade-tab ${activeGroup === globalGroup.label ? 'selected' : ''}`}
@@ -1654,6 +1706,35 @@ function FinalSchemeGlobalViewFrame({
                     </button>
                   </Dropdown>
                 ) : null}
+              </div>
+
+              <div className="vregion-tabs-measure" ref={measureRef} aria-hidden="true">
+                {globalGroup ? (
+                  <span className="site-cascade-tab" data-final-scheme-global-trigger>
+                    <img src={globalGroup.icon} alt="" />
+                    <span className="site-cascade-tab-text">{globalGroup.label}</span>
+                  </span>
+                ) : null}
+                {orderedTabs.map(({ group, item, key: tabKey }) => {
+                  const selection = groupSelections[group.label] ?? getDefaultGroupSelection(group);
+                  const tabLabel = tabKey === activeTabKey ? formatVregionTabLabel(item, selection) : item.name;
+
+                  return (
+                    <span
+                      className={`site-cascade-tab ${tabKey === activeTabKey ? 'selected' : ''}`}
+                      data-final-scheme-tab-key={tabKey}
+                      key={tabKey}
+                    >
+                      <img src={group.icon} alt="" />
+                      <span className="site-cascade-tab-text">{tabLabel}</span>
+                      {tabKey === activeTabKey && item.vdcs.length > 0 ? <img className="site-cascade-tab-caret" src={downIcon} alt="" /> : null}
+                    </span>
+                  );
+                })}
+                <span className="site-cascade-tab scheme-four-more-tab" data-final-scheme-more-trigger>
+                  <span className="site-cascade-tab-text">{`更多 vregion（${flatVregionTabs.length}）`}</span>
+                  <img className="site-cascade-tab-caret" src={downIcon} alt="" />
+                </span>
               </div>
             </div>
           </div>
