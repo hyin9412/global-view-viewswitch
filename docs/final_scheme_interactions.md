@@ -531,3 +531,834 @@
 - 摘要信息始终可见
 - 白框内部内容可滚动
 - 底部按钮区不会被内容挤出弹窗外
+
+## 八、前端实现要点
+
+本节为前端研发补充实现层面的关键信息，与上述产品规则一一对应。
+
+### 8.1 技术栈
+
+- React 18 + TypeScript + Vite
+- UI 组件库：`@tod-m/materials`（源力）+ `@arco-design/web-react`
+- 样式引入顺序：
+  ```ts
+  import '@arco-design/theme-ve-o-design/css/arco.css';
+  import '@tod-m/materials/ve-o/es/style/index.css';
+  import '@tod-m/materials/es/style/index.css';
+  ```
+
+### 8.2 数据结构
+
+站点数据结构定义在 `src/siteVregionDataset.ts`：
+
+```ts
+interface VregionItem {
+  name: string;
+  vdcs?: string[];
+}
+
+interface SiteGroup {
+  site: string;
+  icon: string;
+  vregions: VregionItem[];
+}
+```
+
+数据区分两种模式：
+- `simpleSiteGroups`：简单数据模式
+- `siteGroups`：复杂数据模式
+
+完整站点明细见 [site_vregion_dataset.md](./site_vregion_dataset.md)。
+
+### 8.3 聚合 PSM 数据
+
+当前原型中聚合 PSM 数据为硬编码，实际由后端接口返回：
+
+```ts
+const AGGREGATED_PSMS = [
+  {
+    name: 'cp_govern',
+    vregions: [
+      'China-East', 'China-Enterprise', 'China-HKPay',
+      'China-North', 'China-North6', 'China-Pay', 'China-Pay2',
+      'Asia-CIS', 'Asia-SaaS', 'Asia-SouthEastBD', 'Australia-SouthEastBD',
+    ],
+  },
+  {
+    name: 'toutiao.mysql.cp_govern_read',
+    vregions: [
+      'Europe-WestBD', 'Singapore-SaaS', 'US-Compliance', 'US-EE',
+      'US-EastBD', 'US-TTP3', 'US-TTP4', 'US-WestBD', 'Europe-CentralBD',
+    ],
+  },
+];
+```
+
+`VREGION_TO_PSM` 是一个 `Map<string, string>`，用于根据当前 Vregion 反查所属 PSM，实现页面标题联动。
+
+### 8.4 响应式关键常量
+
+```ts
+const VREGION_TAB_GAP = 16;
+
+const FINAL_SCHEME_RESPONSIVE_PINNED_VREGIONS = [
+  { minWidth: 1920, withSidebar: 8, withoutSidebar: 9 },
+  { minWidth: 1440, withSidebar: 6, withoutSidebar: 7 },
+  { minWidth: 0,    withSidebar: 5, withoutSidebar: 6 },
+];
+```
+
+- 侧边栏宽度固定为 `200px`
+- 右侧有效宽度 = `window.innerWidth - 200`（有侧边栏时）
+- Tab 宽度计算使用 `useRef` + `getBoundingClientRect()` 获取真实渲染宽度，不能仅按字符数估算
+- 当前激活项如果文案为 `Vregion / VDC` 格式，需按实际宽度参与计算
+- `更多 Vregion` 入口本身预留完整展示空间，不参与截断
+
+### 8.5 宽度计算流程
+
+1. 获取容器可用宽度
+2. 依次减去「全球视图」Tab 宽度、「更多 Vregion」入口宽度
+3. 遍历常驻 Vregion 列表，累加每个 Tab 的真实宽度 + 间距
+4. 当累加宽度超过剩余空间时停止，后续 Tab 收纳进「更多 Vregion」
+5. 如果当前激活项不在可见区域内，优先保证激活项可见（可能替换掉最后一个可见常驻项）
+
+### 8.6 更多 Vregion 回填逻辑
+
+- 从下拉中选中一个被收纳的 Vregion 后，该 Vregion 在外层可见
+- 回填是展示层调整，不修改 `自定义 Tab 展示` 中保存的常驻配置顺序
+- 如果回填后文案较长导致空间不足，重新执行宽度计算
+- 放不下的其他项继续收纳，「更多 Vregion」入口始终完整展示
+
+### 8.7 屏宽变化监听
+
+使用 `window.addEventListener('resize', ...)` 监听：
+
+- 重新计算可见常驻数量
+- 如果从大屏切到小屏导致已配置常驻项超出上限：
+  - 不删除配置
+  - 超出部分自动收纳
+  - 调用源力 `Message.info('当前屏宽下仅展示前 N 个常驻项')`
+
+### 8.8 管理 PSM 弹窗按钮规则
+
+- 弹窗根据当前数据模式（简单/复杂）决定底部按钮
+- 复杂数据：`取消` + `保存并自定义 Tab 展示` + `保存`
+- 简单数据：`取消` + `保存`
+- 「保存并自定义 Tab 展示」：先关闭管理 PSM 弹窗，再打开自定义 Tab 展示弹窗
+
+### 8.9 自定义 Tab 展示勾选规则
+
+- 勾选上限 = 当前屏宽下外层可见上限（与响应式常量一致）
+- 达到上限后，未勾选项 `disabled`
+- 如果用户在更大屏宽下配置了超上限项，切到小屏打开弹窗时：
+  - 已有超上限勾选不自动取消
+  - 但当前屏宽下不允许继续新增
+- 全部取消勾选时，「保存」按钮 `disabled`，hover 出 Tooltip 提示「至少选择1个Vregion」
+
+### 8.10 恢复默认按钮状态
+
+- 判断「当前状态是否与默认一致」需要同时比较：
+  1. 勾选项集合是否一致
+  2. 展示顺序是否一致
+- 弹窗刚打开时，缓存默认状态作为比较基准
+- 任意勾选项或顺序变化后，按钮恢复可点击
+- 点击「恢复默认」后，状态回到默认，按钮重新置灰
+
+### 8.11 默认选中逻辑
+
+- 页面初始化默认选中 `CN` 站点
+- 无 `CN` 时取第一个可用 Site
+- 每个 Site 默认选中第一个 Vregion
+- Vregion 有 VDC 时默认取第一个 VDC
+- 从列表页跳转过来时，读取 URL 参数中的 `x-global-vregion` 和 `x-global-vdc` 作为初始选中值
+
+### 8.12 VDC 内联切换
+
+- 点击未激活的 Vregion Tab：正常切换 Vregion
+- 点击已激活的、无 VDC 的 Vregion Tab：无反应
+- 点击已激活的、有 VDC 的 Vregion Tab：弹出 VDC 选择菜单
+- 菜单位置锚定在当前 Tab 正下方
+- 选中 VDC 后更新视图，Tab 文案变为 `Vregion / VDC`
+
+### 8.13 组件映射
+
+| 交互元素 | 组件来源 |
+| --- | --- |
+| Alert（顶部提示） | `@tod-m/materials/ve-o` |
+| Message（屏宽提示） | `@tod-m/materials/ve-o` |
+| Modal（管理 PSM、自定义 Tab 展示） | `@tod-m/materials/ve-o` |
+| Tooltip（禁用按钮提示） | `@tod-m/materials/ve-o` |
+| Button | `@arco-design/web-react` |
+| Dropdown（更多 Vregion、VDC 选择） | `@arco-design/web-react` |
+| Popover（聚合 PSM 浮层） | `@arco-design/web-react` |
+| Table（管理 PSM 表格） | `@arco-design/web-react` |
+| Tag（Site/Vregion 标签） | `@arco-design/web-react` |
+
+### 8.14 已知边界与注意事项
+
+- 全球控制面当前不存储个人维度配置，`自定义 Tab 展示` 的结果按聚合 PSM 维度生效
+- `+N` 折叠 Tag 使用白底细描边圆角样式，hover 时描边和数字变为 `@primary-6`
+- VDC 数字徽标只展示数量，不直接展示名称
+- 管理 PSM 表格操作列固定在右侧，横向滚动时仍可操作
+- 图标全部使用内联 SVG，不引用第三方图标库
+
+## 九、视觉样式规范
+
+本章从源码中提取最终方案各模块的精确样式值，供前端还原参考。所有颜色优先使用 CSS 变量（源力 Token），括号内为降级 Hex 值。
+
+### 9.1 全局设计 Token
+
+#### 字体
+
+```
+font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", SimHei, Arial, Helvetica, sans-serif;
+```
+
+#### 颜色 Token 对照
+
+| Token 名称 | Hex 值 | 用途 |
+| --- | --- | --- |
+| `--Primary-Color-primary-6` | `#1664FF` | 主色、选中态文字、链接、按钮 |
+| `--Primary-Color-primary-5` | `#4080FF` | 主色 hover 态 |
+| `--Text-color-text-1` | `#0C0D0E` | 一级文字、标题 |
+| `--Text-color-text-2` | `#42464E` | 二级文字、正文 |
+| `--color-text-2` | `#4E5969` | 三级文字、辅助说明 |
+| `--color-text-3` | `#86909C` | 占位符、禁用文字 |
+| `--color-fill-2` | `#C9CDD4` | 图标次级色、分割线 |
+| `--Line-color-border-2` | `#EAEDF1` | 边框、分割线 |
+| `--color-border-2` | `#EAEDF1` | 边框、分割线 |
+| `--Background-color-bg-4` | `#F6F8FA` | 表头背景、Tag 背景、Tab 未选中背景 |
+| `--color-bg-4` | `#F6F8FA` | 表头背景、Tag 背景 |
+| `--color-bg-white` | `#FFFFFF` | 白色背景 |
+| `--danger-6` | `#F53F3F` | 移除按钮、错误色 |
+| `--color-fill-4` | `#737A87` | 面包屑次级文字 |
+| `--color-fill-3` | `#80858C` | 表头标签文字 |
+
+#### 字号与字重
+
+| 层级 | 字号 | 字重 | 行高 | 用途 |
+| --- | --- | --- | --- | --- |
+| 页面标题 | 16px | 500 | 24px | 资源名称 |
+| 区块标题 | 14px | 500/600 | 22px | 配置区标题、Card 标题 |
+| 正文 | 13px | 400 | 22px | Tab 文字、表格内容、菜单项 |
+| 正文强调 | 13px | 500 | 22px | 选中 Tab、按钮文字 |
+| 辅助文字 | 12px | 400 | 20px | 面包屑、Popover 内容、Tag |
+| 辅助强调 | 12px | 500 | 20px | Popover 表头、数字徽标 |
+
+---
+
+### 9.2 聚合 X 个 PSM（面包屑区域）
+
+#### 容器
+
+- 类名：`.breadcrumb-compact-row`
+- 布局：`inline-flex`，垂直居中
+- 子元素间距：4px（`column-gap: 4px`）
+
+#### 面包屑文字
+
+- 类名：`.breadcrumb-line`
+- 字号：12px
+- 字重：500
+- 颜色：`#42464E`
+- 行高：20px
+- 字间距：0.04px
+
+面包屑中分隔符使用 `<i>` 元素：
+- 宽 1px，高 12px
+- 背景色 `#42464E`
+- 左右 margin 12px
+- 旋转 30°（模拟斜线）
+
+面包屑中次级文字（`.muted`）：
+- 颜色：`#737A87`
+- 字重：400
+
+#### 分隔横线
+
+- 类名：`.breadcrumb-aggregate-dash`
+- 颜色：`#737A87`
+- 字号：12px
+
+#### 「聚合 X 个 PSM」触发文字
+
+- 类名：`.breadcrumb-aggregate`
+- 字体：PingFang SC 字体栈
+- 字号：12px
+- 字重：400
+- 颜色：`#737A87`
+- 行高：20px
+- cursor：`pointer`
+
+其中数字部分（`<strong>`）：
+- 颜色：`#737A87`
+- 字号：12px
+- 字重：500
+- 文字装饰：underline（下划线）
+
+#### 使用组件
+
+- **Popover**：来自 `@arco-design/web-react`
+- 触发方式：`trigger="hover"`
+- 弹出位置：`position="bottom"`
+- 外层包裹类名：`.aggregate-psm-popover-wrapper`
+
+---
+
+### 9.3 聚合 PSM 浮层（Popover）
+
+#### 浮层容器
+
+- 类名：`.aggregate-psm-popover-wrapper .arco-popover-content`
+- 宽度：532px（最大 `calc(100vw - 32px)`）
+- 内边距：12px 16px
+- box-sizing：border-box
+
+#### 两列网格
+
+- 类名：`.aggregate-psm-popover-header` / `.aggregate-psm-popover-row`
+- 布局：CSS Grid
+- 列定义：`grid-template-columns: minmax(0, 240px) minmax(0, 240px)`
+- 列间距：20px（`column-gap: 20px`）
+- 两列各占 240px
+
+#### 表头
+
+- 类名：`.aggregate-psm-popover-header`
+- 下边框：1px solid `#EAEDF1`
+- 下内边距：8px
+- 颜色：`#80858C`
+- 字号：12px
+- 行高：20px
+- 字间距：0.04px
+
+#### 内容区
+
+- 类名：`.aggregate-psm-popover-body`
+- 布局：flex column
+- 行间距：8px（`row-gap: 8px`）
+- 上内边距：8px
+
+#### 数据行
+
+- 类名：`.aggregate-psm-popover-row`
+- 布局：grid（与表头同列定义）
+- 对齐：`align-items: flex-start`
+
+PSM 名称 / Vregion 列表文字：
+- 类名：`.aggregate-psm-name` / `.aggregate-psm-vregions`
+- 颜色：`#42464E`
+- 字号：12px
+- 行高：20px
+- 字间距：0.04px
+- 换行：`white-space: normal; overflow-wrap: anywhere; word-break: break-word`
+
+#### 底部「管理 PSM」按钮
+
+- 类名：`.aggregate-psm-popover-edit`
+- 上外边距：12px
+- 边框：0
+- 背景：transparent
+- 内边距：0
+- 颜色：`var(--Primary-Color-primary-6, #1664FF)`
+- 字号：12px
+- 行高：20px
+- cursor：pointer
+- Hover 颜色：`var(--Primary-Color-primary-5, #4080FF)`
+
+按钮内部：
+- 类名：`.edit-entry-content`
+- 布局：inline-flex，居中
+- 间距：6px（icon 与文字之间）
+
+设置图标：
+- 类名：`.edit-entry-icon`
+- 尺寸：16×16px
+
+---
+
+### 9.4 Vregion Tab 切换
+
+#### Tab 栏容器
+
+- 类名：`.global-group-tabs.scheme-four`（最终方案复用此样式）
+- 布局：flex
+- 子元素间距：8px（`column-gap: 8px`）
+- 宽度：100%
+- 溢出：`overflow-x: auto`（最终方案实际由 JS 控制可见性，不出现滚动条）
+- 背景：transparent
+- 内边距：0
+- 圆角：0
+
+#### 单个 Tab（未选中）
+
+- 类名：`.global-view-frame.scheme-final .site-cascade-tab`
+- 布局：inline-flex，垂直居中
+- 内边距：7px 16px
+- 边框：none
+- 圆角：4px 4px 0 0
+- 背景：`var(--color-bg-4, #F6F8FA)`
+- 颜色：`var(--color-text-2, #4E5969)`
+- 字号：13px
+- 字重：400
+- 行高：22px
+- 字间距：0.04px
+- cursor：pointer
+- 边框效果通过 `box-shadow inset` 实现：
+  ```
+  box-shadow:
+    inset 0 1px 0 var(--color-border-2, #EAEDF1),
+    inset -1px 0 0 var(--color-border-2, #EAEDF1),
+    inset 1px 0 0 var(--color-border-2, #EAEDF1);
+  ```
+
+#### 单个 Tab（Hover）
+
+- 背景：保持 `var(--color-bg-4, #F6F8FA)`
+- 颜色：`var(--Primary-Color-primary-6, #1664FF)`
+
+#### 单个 Tab（选中）
+
+- 类名追加：`.selected`
+- 内边距：7px 16px
+- 背景：transparent
+- 颜色：`var(--Primary-Color-primary-6, #1664FF)`
+- 字重：500
+- 顶部蓝色指示条：`inset 0 2px 0 #006EFF`
+- 底部白色遮罩线（覆盖容器分割线）：
+  ```
+  ::after {
+    position: absolute;
+    left: 1px;
+    bottom: 0;
+    width: calc(100% - 2px);
+    height: 1px;
+    background: var(--color-bg-white, #fff);
+  }
+  ```
+
+#### 全球视图 Tab
+
+与普通 Tab 样式一致，但永远是可点击的切换入口，不显示下拉箭头。
+
+#### Tab 内站点图标
+
+- 尺寸：16×16px
+- 圆角：100px（圆形）
+- 选中时尺寸仍为 16×16px
+
+#### Tab 文字
+
+- 类名：`.site-cascade-tab-text`
+- 溢出：`text-overflow: ellipsis; white-space: nowrap`
+
+选中态时文字颜色和字重继承父级（蓝色，500）。
+
+#### VDC 下拉箭头
+
+- 类名：`.site-cascade-tab-caret`
+- 尺寸：12×12px
+- 左边距：6px
+- 仅在 Tab 已选中且该 Vregion 有 VDC 时显示
+
+#### Tab 下方分割线
+
+最终方案 Tab 栏下方有一条贯通分割线：
+- 通过 `.global-view-content` 的 `::after` 伪元素或容器 border 实现
+- 颜色：`#EAEDF1`
+- 高度：1px
+- 选中 Tab 通过底部白色 `::after` 遮罩断开该线，营造连通效果
+
+---
+
+### 9.5 更多 Vregion 下拉菜单
+
+#### 触发按钮
+
+- 类名：`.site-cascade-tab.scheme-four-more-tab`
+- 与普通 Tab 样式一致
+- 右内边距：12px（比普通 Tab 少 4px）
+- 文字格式：`更多 Vregion（N）`
+- 始终显示下拉箭头（12×12px，左边距 4px）
+
+#### 使用组件
+
+- **Dropdown**：来自 `@arco-design/web-react`
+- 触发方式：`trigger="click"`
+- 弹出位置：`position="br"`（底部右对齐）
+- 下拉菜单使用 Arco `Menu` 组件
+
+#### 下拉面板
+
+- 类名：`.scheme-four-overflow-dropdown`
+- 最小宽度：220px
+- 背景：`#FFFFFF`
+- 圆角：4px
+- 溢出：hidden
+
+#### 可滚动区域
+
+- 类名：`.scheme-four-overflow-scroll`
+- 最大高度：`calc(36px * 5.5)`（约 5.5 个菜单项高度）
+- 溢出：`overflow-y: auto`
+
+#### 菜单项
+
+- 类名：`.scheme-four-overflow-item`
+- 布局：flex，垂直居中
+- 子元素间距：6px
+- 宽度：100%
+
+站点图标：
+- 尺寸：16×16px
+- 圆角：100px
+
+Vregion 名称：
+- 字号：13px
+- 溢出省略：`text-overflow: ellipsis; white-space: nowrap`
+- 颜色继承 Arco Menu 默认样式
+
+选中项：
+- 由 Arco Menu `selectedKeys` 控制
+- 文字变蓝，字重 500
+
+#### 底部「自定义 Tab 展示」入口
+
+- 类名：`.scheme-four-overflow-edit`
+- 宽度：100%
+- 内边距：9px 12px
+- 边框：0
+- 上边框：1px solid `#EAEDF1`
+- 背景：`#FFFFFF`
+- 颜色：`var(--Primary-Color-primary-6, #1664FF)`
+- 字号：13px
+- 字重：500
+- 行高：22px
+- 字间距：0.04px
+- 文本对齐：left
+- cursor：pointer
+- Hover：背景保持白色，颜色变为 `var(--Primary-Color-primary-5, #4080FF)`
+
+---
+
+### 9.6 VDC 内联选择菜单
+
+- **Dropdown** 组件，`position="bl"`（底部左对齐）
+- 菜单类名：`.site-cascade-menu`
+- 最小宽度：220px
+- 使用 Arco `Menu`，`selectedKeys` 绑定当前选中的 VDC
+- 菜单项为纯文字（VDC 名称），字号 13px
+
+---
+
+### 9.7 管理 PSM 弹窗
+
+#### 弹窗容器
+
+- **Modal** 组件：来自 `@tod-m/materials/ve-o`
+- 类名：`.manage-psm-modal`
+- 宽度：`min(600px, calc(100vw - 32px))`，maxWidth 600px
+- 最大高度：612px
+- 布局：flex column（使内容区可滚动）
+- 标题：「管理 PSM」（使用 Modal 默认 title 样式）
+- 遮罩点击关闭：`maskClosable`
+
+#### 内容区
+
+- 类名：`.manage-psm-modal .arco-modal-content`
+- 内边距：0 24px 24px
+- 背景：`#FFFFFF`
+- 溢出：`overflow-y: auto`
+- flex：1（占满剩余高度）
+
+#### 顶部摘要栏
+
+- 类名：`.edit-view-psm-header`
+- 布局：flex，两端对齐
+- 垂直居中
+
+左侧「已添加 PSM：N条」：
+- 类名：`.edit-view-psm-count`
+- 颜色：`#42464E`
+- 字号：13px
+- 字重：500
+- 行高：22px
+- margin：0
+
+右侧「添加 PSM」按钮：
+- 类名：`.edit-view-add-psm`
+- 布局：inline-flex，居中
+- 间距：8px（icon 与文字）
+- 边框：0
+- 背景：transparent
+- 内边距：0
+- 颜色：`var(--Primary-Color-primary-6, #1664FF)`
+- 字号：13px
+- 字重：500
+- 行高：22px
+- cursor：pointer
+
+加号图标：
+- 类名：`.edit-view-add-psm-icon`
+- 尺寸：18×18px
+- 圆角：50%
+- 背景：`rgba(22, 100, 255, 0.12)`
+- 字号：14px
+- 行高：18px
+- 文字居中
+
+#### 数据表格
+
+- **Table** 组件：来自 `@arco-design/web-react`
+- 类名：`.edit-view-psm-table`
+- 属性：`borderCell`（带单元格边框）、`pagination={false}`、`scroll={{ x: 980 }}`
+- 圆角：4px
+- 背景：白色
+
+表头：
+- 背景：`var(--Background-color-bg-4, #F6F8FA)`
+- 表头/单元格字号：13px
+
+列宽定义：
+
+| 列 | 宽度 | 说明 |
+| --- | --- | --- |
+| PSM | 200px | 纯文字 |
+| Site | 220px | 线性 Tag 组 |
+| Vregion | 300px | 线性 Tag 组 |
+| VDC | 120px | 数字徽标 |
+| 操作 | 72px | `fixed: 'right'` |
+
+#### 线性 Tag（Site / Vregion 列）
+
+- 类名：`.edit-view-linear-tag-action`
+- 展示：inline-flex，居中
+- 最小宽度：28px
+- 高度：22px
+- 内边距：0 5px
+- 边框：1px solid `var(--Line-color-border-2, #EAEDF1)`
+- 圆角：20px
+- 背景：`#FFFFFF`
+- 颜色：`var(--Text-color-text-2, #42464E)`
+- 字号：13px
+- 字重：500
+- 行高：20px
+- Hover：边框色和文字色变为 `var(--Primary-Color-primary-6, #1664FF)`
+- 过渡动画：border-color 0.2s, color 0.2s
+
+Tag 容器：
+- 类名：`.edit-view-linear-tags`
+- 布局：inline-flex，nowrap
+- 间距：8px
+- 溢出：hidden
+
+`+N` 折叠 Popover：
+- 类名：`.edit-view-linear-tags-popover`
+- 最小宽度：160px，最大宽度 320px
+- 布局：flex column
+- 间距：4px
+- 标题：12px，字重 500，颜色 `#0C0D0E`
+- 条目：12px，颜色 `#42464E`，行高 20px
+- z-index：4000
+
+#### VDC 数字徽标
+
+- 类名：`.edit-view-vdc-tag`
+- 展示：inline-flex，column 方向，居中
+- 最小宽度：20px
+- 高度：20px
+- 内边距：4px 6px
+- 圆角：4px
+- 背景：`var(--Background-color-bg-4, #F6F8FA)`
+- cursor：pointer
+- box-sizing：border-box
+
+数字：
+- 类名：`.edit-view-vdc-tag-count`
+- 颜色：`var(--Fill7-1D2129-, #1D2129)`
+- 字号：12px
+- 字重：400
+- 行高：12px
+
+虚线装饰：
+- 类名：`.edit-view-vdc-tag-line`
+- 宽度：8px
+- 高度：1px
+- 上边框：1px dashed `#737A87`
+
+无 VDC 时显示 `-`。
+
+VDC 明细 Popover：
+- 类名：`.edit-view-vdc-popover`
+- 最小宽度：220px
+- 布局：flex column
+- 间距：8px
+- 每行：Vregion 名称（12px，字重 500，颜色 `#0C0D0E`）+ VDC 列表（12px，颜色 `#42464E`）
+- 行间距：2px
+
+#### 移除按钮
+
+- 类名：`.edit-view-remove-button`
+- 边框：0
+- 背景：transparent
+- 内边距：0
+- 颜色：`#F53F3F`
+- 字号：13px
+- 行高：22px
+- cursor：pointer
+- white-space：nowrap
+
+#### 底部按钮栏
+
+- 类名：`.manage-psm-modal-footer`
+- 布局：flex，右对齐
+- 间距：12px（`gap: 12px`）
+
+按钮使用 Arco `Button`：
+- 「取消」：默认样式（secondary）
+- 「保存并自定义 Tab 展示」：默认样式（secondary），仅复杂数据模式显示
+- 「保存」：`type="primary"`（蓝色主按钮）
+
+---
+
+### 9.8 自定义 Tab 展示弹窗
+
+#### 弹窗容器
+
+- **Modal** 组件：来自 `@tod-m/materials/ve-o`
+- 类名：`.custom-tabs-modal`
+- 宽度：`min(600px, calc(100vw - 32px))`，maxWidth 600px
+- 最大高度：`min(612px, calc(100vh - 32px))`
+- 圆角：12px
+- 背景：`#FFFFFF`
+- 溢出：hidden
+- 标题：「自定义 Tab 展示」
+- 遮罩点击关闭：`maskClosable`
+
+#### 内容区
+
+- 类名：`.custom-tabs-modal .arco-modal-content`
+- 内边距：0 24px 24px
+- 布局：flex column
+- 溢出：hidden
+- flex：1 1 auto
+
+#### Body 容器
+
+- 类名：`.custom-tabs-modal-body`
+- 布局：grid
+- 行定义：`grid-template-rows: auto minmax(0, 1fr)`
+- 最大高度：474px
+- 行间距：12px
+- 溢出：hidden
+
+#### 摘要文字
+
+- 类名：`.custom-tabs-modal-summary`
+- 文案：`已选 X/Y 个 Vregion`
+- 颜色：`#42464E`
+- 字号：13px
+- 字重：500
+- 行高：22px
+
+#### 白框内容区
+
+- 类名：`.custom-tabs-modal-grid`
+- 布局：CSS Grid，两列
+- 列定义：`grid-template-columns: repeat(2, minmax(0, 1fr))`
+- 间距：12px 16px（行间距 12px，列间距 16px）
+- 内边距：16px 20px
+- 边框：1px solid `#EAEDF1`
+- 圆角：8px
+- 背景：`#FFFFFF`
+- 溢出：`overflow-y: auto`
+- box-sizing：border-box
+
+#### 单个选项
+
+- 类名：`.custom-tabs-modal-item`
+- 布局：flex，垂直居中
+- 高度：22px
+- 内边距：0
+- 颜色：`#0C0D0E`
+- 字号：13px
+- 行高：22px
+- cursor：pointer
+
+Checkbox：
+- 原生 `<input type="checkbox">`
+- 右边距：8px
+- accent-color：`#1664FF`（选中色）
+- 尺寸：浏览器默认
+
+站点图标：
+- 尺寸：16×16px
+- 右边距：4px
+
+禁用态：
+- 类名追加：`.disabled`
+- 透明度：0.48
+- cursor：not-allowed
+
+#### 底部按钮栏
+
+- 类名：`.custom-tabs-modal-footer`
+- 布局：flex，两端对齐
+- 间距：12px
+
+左侧：
+- 「恢复默认」按钮：Arco Button 默认样式
+- 禁用条件：勾选项和顺序与默认完全一致时 `disabled`
+
+右侧：
+- 类名：`.custom-tabs-modal-footer-actions`
+- 布局：inline-flex
+- 间距：12px
+- 「取消」：Arco Button 默认样式
+- 「保存」：Arco Button `type="primary"`
+  - 禁用条件：未勾选任何 Vregion 时 `disabled`
+  - 禁用时 hover 出黑色 Tooltip，提示「至少选择1个Vregion」
+  - Tooltip 组件来自 `@tod-m/materials/ve-o`
+
+---
+
+### 9.9 页面内容区间距
+
+最终方案页面框架的间距值：
+
+| 位置 | 值 |
+| --- | --- |
+| 内容区左右内边距 | 32px |
+| 内容区上内边距 | 20px |
+| 内容区下内边距 | 0（Tab 栏贴底） |
+| 面包屑行最小高度 | 32px |
+| 面包屑与聚合 PSM 间距 | 4px |
+| 面包屑行到 Tab 栏间距 | 4px（`row-gap`） |
+| 全球视图/页面背景色 | `#FCFDFE` |
+| 底部边框 | 1px solid `#EAEDF1` |
+
+### 9.10 屏宽变化 Message 提示
+
+- **Message** 组件：来自 `@tod-m/materials/ve-o`
+- 类型：`Message.info`
+- 文案：`当前屏宽下仅展示前 N 个常驻项`
+- 位置：页面顶部，absolute 定位
+- 类名：`.page-inline-message`
+- z-index：1004
+- 距顶部：20px
+- 左右内边距：16px
+
+### 9.11 侧边栏（可选）
+
+- 宽度：200px（`flex: 0 0 200px`）
+- 背景：`#F6F8FA`
+- 右边框：1px solid `#EAEDF1`
+- 导航区内边距：12px
+- 菜单项高度：36px
+- 菜单项内边距：7px 12px
+- 菜单项字号：13px
+- 菜单项颜色：`#0C0D0E`
+- 选中态背景：`#1664FF14`（主色 8% 透明度）
+- 选中态文字：`#1664FF`，字重 500
+- 菜单项圆角：4px
+- 菜单项之间间距：4px（`row-gap: 4px`）
